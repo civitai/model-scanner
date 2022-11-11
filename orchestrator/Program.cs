@@ -9,15 +9,15 @@ var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
 
-var scannerQueueChannel = Channel.CreateUnbounded<(string modelUrl, string callbackUrl)>();
+var scannerQueueChannel = Channel.CreateUnbounded<(string fileUrl, string callbackUrl)>();
 var callbackQueueChannel = Channel.CreateUnbounded<(string callbackUrl, ScanResult result)>();
 
 bool isScanning = false;
 bool isInvokingCallback = false;
 
-app.MapPost("/enqueue", async (string modelUrl, string callbackUrl) =>
+app.MapPost("/enqueue", async (string fileUrl, string callbackUrl) =>
 {
-    await scannerQueueChannel.Writer.WriteAsync((modelUrl, callbackUrl));
+    await scannerQueueChannel.Writer.WriteAsync((fileUrl, callbackUrl));
 });
 
 app.MapGet("/", () => new
@@ -33,19 +33,19 @@ var scannerTask = Task.Run(async () =>
     var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Scanner");
     logger.LogInformation("Observing the queue...");
 
-    await foreach (var (modelUrl, callbackUrl) in scannerQueueChannel.Reader.ReadAllAsync())
+    await foreach (var (fileUrl, callbackUrl) in scannerQueueChannel.Reader.ReadAllAsync())
     {
         try
         {
             isScanning = true;
 
-            logger.LogInformation("Scanning {modelurl}", modelUrl);
+            logger.LogInformation("Scanning {fileUrl}", fileUrl);
 
             var stopwatch = Stopwatch.StartNew();
 
             var process = new Process
             {
-                StartInfo = new ProcessStartInfo("docker", $"run --rm civitai-model-scanner {modelUrl}")
+                StartInfo = new ProcessStartInfo("docker", $"run --rm civitai-model-scanner {fileUrl}")
                 {
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
@@ -68,7 +68,7 @@ var scannerTask = Task.Run(async () =>
             await process.WaitForExitAsync();
             var output = outputBuilder.ToString();
 
-            logger.LogInformation("Scan for {modelUrl} completed in {elapsed}, queuing callback...", modelUrl, stopwatch.Elapsed);
+            logger.LogInformation("Scan for {fileUrl} completed in {elapsed}, queuing callback...", fileUrl, stopwatch.Elapsed);
             logger.LogDebug(output);
 
             var result = JsonSerializer.Deserialize<ScanResult>(output, new JsonSerializerOptions
