@@ -8,4 +8,5 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
     pip3 install picklescan
 
 COPY ./entrypoint.sh /
+RUN chmod +x entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
