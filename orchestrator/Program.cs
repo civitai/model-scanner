@@ -35,7 +35,7 @@ var scannerTask = Task.Run(async () =>
 
         var process = new Process
         {
-            StartInfo = new ProcessStartInfo("docker", $"run -it --rm civitai-model-scanner {modelUrl}")
+            StartInfo = new ProcessStartInfo("docker", $"run --rm civitai-model-scanner {modelUrl}")
             {
                 CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden,
@@ -75,7 +75,15 @@ var callbackTask = Task.Run(async () =>
     await foreach (var (callbackUrl, result) in callbackQueueChannel.Reader.ReadAllAsync())
     {
         logger.LogInformation("Invoking {callbackUrl} with result {result}", callbackUrl, result);
-        await httpClient.PostAsync(callbackUrl, new StringContent(result));
+        
+        try
+        {
+            await httpClient.PostAsync(callbackUrl, new StringContent(result));
+        }
+        catch(Exception ex)
+        {
+            logger.LogError(ex, "Exception raised during callback, no retry is configured. The result will be ignored");
+        }
     }
 });
 

@@ -1,0 +1,18 @@
+version: '3.9'
+services:
+  model-scanner:
+    container_name: civitai-model-scanner
+    build:
+      context: ./model-scanner/
+      dockerfile: Dockerfile
+  orchestrator:
+    container_name: civitai-model-scanner-orchestrator
+    build:
+      context: ./orchestrator/
+      dockerfile: Dockerfile
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    ports:
+      - "80:80"
+    depends_on:
+      - model-scanner
