@@ -1,12 +1,12 @@
 version: '3.9'
 services:
   model-scanner:
-    container_name: civitai-model-scanner
+    image: civitai-model-scanner
     build:
       context: ./model-scanner/
       dockerfile: Dockerfile
   orchestrator:
-    container_name: civitai-model-scanner-orchestrator
+    image: civitai-model-scanner-orchestrator
     build:
       context: ./orchestrator/
       dockerfile: Dockerfile

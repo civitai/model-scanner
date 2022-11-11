@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Channels;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,7 +9,7 @@ var app = builder.Build();
 
 
 var scannerQueueChannel = Channel.CreateUnbounded<(string modelUrl, string callbackUrl)>();
-var callbackQueueChannel = Channel.CreateUnbounded<(string callbackUrl, string result)>();
+var callbackQueueChannel = Channel.CreateUnbounded<(string callbackUrl, ScanResult result)>();
 
 app.MapPost("/enqueue", async (string modelUrl, string callbackUrl) =>
 {
@@ -61,7 +62,12 @@ var scannerTask = Task.Run(async () =>
         logger.LogInformation("Scan for {modelUrl} completed in {elapsed}, queuing callback...", modelUrl, stopwatch.Elapsed);
         logger.LogDebug(output);
 
-        await callbackQueueChannel.Writer.WriteAsync((callbackUrl, output));
+        var result = JsonSerializer.Deserialize<ScanResult>(output, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        })!;
+
+        await callbackQueueChannel.Writer.WriteAsync((callbackUrl, result));
     }
 });
 
@@ -78,7 +84,7 @@ var callbackTask = Task.Run(async () =>
         
         try
         {
-            await httpClient.PostAsync(callbackUrl, new StringContent(result));
+            await httpClient.PostAsJsonAsync(callbackUrl, result);
         }
         catch(Exception ex)
         {
@@ -98,3 +104,12 @@ finally
 }
 
 await Task.WhenAll(scannerTask, callbackTask);
+
+
+class ScanResult {
+    public string? Url { get; set; } 
+    public int PicklescanExitCode { get; set; }
+    public string? PicklescanOutput { get; set; }
+    public int ClamscanExitCode { get; set; }
+    public string? ClamscanOutput { get; set; }
+}
