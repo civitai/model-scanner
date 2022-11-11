@@ -7,5 +7,5 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
     apt-get install -y python3 python3-pip && \
     pip3 install picklescan
 
-COPY ./scan.sh /
-ENTRYPOINT ["/scan.sh"]
+COPY ./entrypoint.sh /
+ENTRYPOINT ["/entrypoint.sh"]
