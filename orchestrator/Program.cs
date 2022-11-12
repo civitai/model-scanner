@@ -60,7 +60,7 @@ var scannerTask = Task.Run(async () =>
                 outputBuilder.Append(e.Data);
             process.ErrorDataReceived += (_, e) =>
                 outputBuilder.Append(e.Data);
-        
+
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
@@ -143,7 +143,6 @@ HashSet<string> ParseGlobalImports(string? picklescanOutput)
         foreach (Match globalImportListMatch in Regex.Matches(picklescanOutput, globalImportListsRegex))
         {
             var globalImportList = globalImportListMatch.Groups[1];
-            
             const string globalImportsRegex = """\((.+?)\)""";
 
             foreach (Match globalImportMatch in Regex.Matches(globalImportList.Value, globalImportsRegex))
@@ -177,7 +176,8 @@ HashSet<string> ParseDangerousImports(string? picklescanOutput)
 
 
 class ScanResult {
-    public string? Url { get; set; } 
+    public string? Url { get; set; }
+    public int FileExists { get; set; }
     public int PicklescanExitCode { get; set; }
     public string? PicklescanOutput { get; set; }
     public HashSet<string>? PicklescanGlobalImports { get; set; }
