@@ -25,7 +25,8 @@ app.MapGet("/", () => new
     IsScanning = isScanning,
     ScannerQueueSize = scannerQueueChannel.Reader.Count,
     IsInvokingCallback = isInvokingCallback,
-    CallbackQueueSize = callbackQueueChannel.Reader.Count
+    CallbackQueueSize = callbackQueueChannel.Reader.Count,
+    Version = 1
 });
 
 var scannerTask = Task.Run(async () =>
@@ -69,7 +70,7 @@ var scannerTask = Task.Run(async () =>
             var output = outputBuilder.ToString();
 
             logger.LogInformation("Scan for {fileUrl} completed in {elapsed}, queuing callback...", fileUrl, stopwatch.Elapsed);
-            logger.LogDebug(output);
+            logger.LogInformation(output);
 
             var result = JsonSerializer.Deserialize<ScanResult>(output, new JsonSerializerOptions
             {

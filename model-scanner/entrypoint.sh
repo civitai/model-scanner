@@ -11,23 +11,23 @@ if [ -n "$URL" ]; then
     fileExists=0
 
     ## get file
-    echo "Scanning $URL"
+    # echo "Scanning $URL"
     curl -s -f -L -o "model.bin" "$URL"
     fileExists=$(ls -l model.bin | wc -l)
 
     ## if file doesn't exist, exit
     if [ $fileExists -eq 0 ]; then
-        echo "File not found"
+        # echo "File not found"
         jo -p url="$URL" fileExists="$fileExists" picklescanExitCode="$pickescanExitCode" picklescanOutput="$pickescan" clamscanExitCode="$clamscanExitCode" clamscanOutput="$clamscan"
         exit 1
     fi
 
     ## run scans
-    echo "Running PickleScan"
+    # echo "Running PickleScan"
     pickescan=$(picklescan -p model.bin -l DEBUG)
     pickescanExitCode=$?
 
-    echo "Running ClamScan"
+    # echo "Running ClamScan"
     clamscan=$(clamscan model.bin)
     clamscanExitCode=$?
 
