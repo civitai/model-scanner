@@ -32,7 +32,7 @@ public class CloudStorageService
         var serviceUri = new Uri(_amazonS3Client.Config.ServiceURL);
         var fileUri = new Uri(fileUrl);
 
-        return fileUri.Authority == serviceUri.Authority;
+        return fileUri.Authority.EndsWith(serviceUri.Authority, StringComparison.Ordinal);
     }
 
     Task<PutObjectResponse> UploadFileInternal(string filePath, string key)
@@ -47,28 +47,49 @@ public class CloudStorageService
         };
 
         return _amazonS3Client.PutObjectAsync(request);
+    }
 
+    async Task<bool> ObjectExists(string key)
+    {
+        try
+        {
+            var response = await _amazonS3Client.GetObjectMetadataAsync(new GetObjectMetadataRequest
+            {
+                BucketName = _uploadBucket,
+                Key = key,
+            });
+
+            return true;
+        }
+        catch (AmazonS3Exception ex)
+            when (ex.ErrorCode == "NotFound")
+        {
+            return false;
+        }
     }
 
     public async Task<string> UploadFile(string filePath, string suggestedKey)
     {
-        var key = suggestedKey;
+        var key = await ObjectExists(suggestedKey) switch
+        {
+            // Garble up some new unique file name
+            true => $"{Path.GetFileNameWithoutExtension(suggestedKey)}-{Path.GetRandomFileName()}{Path.GetExtension(suggestedKey)}",
+            false => suggestedKey
+        };
 
         // Try and upload the file with its original name
         var response = await UploadFileInternal(filePath, key);
-
-        // On conflict, generate a new random name and repeat again
-        if (response.HttpStatusCode is System.Net.HttpStatusCode.Conflict)
-        {
-            key = Path.ChangeExtension(Path.GetRandomFileName(), Path.GetExtension(filePath));
-            response = await UploadFileInternal(filePath, key);
-        }
 
         if (response.HttpStatusCode is not System.Net.HttpStatusCode.OK)
         {
             throw new InvalidOperationException($"Expected the upload to have succeeded, got: {response.HttpStatusCode}");
         }
 
-        return $"{_amazonS3Client.Config.ServiceURL}{_uploadBucket}/{key}";
+        // Generate a url. This URL is not pre-signed. Alternative, use:
+        return _amazonS3Client.GetPreSignedURL(new GetPreSignedUrlRequest {
+            BucketName = _uploadBucket,
+            Key = key,
+            Expires = DateTime.UtcNow.AddMinutes(60) // Url is valid for 1 hour. Copied from civitai main platform
+        });
     }
 }

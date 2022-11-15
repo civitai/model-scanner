@@ -63,8 +63,7 @@ var downloadTask = Task.Run(async () =>
             {
                 logger.LogInformation("Uploading {fileUrl} to cloud storage", fileUrl);
                 var actualFileUrl = await cloudStorageService.UploadFile(filePath, Path.GetFileName(fileUrl));
-                logger.LogInformation("Uploaded {fileUrl} as {actualFileUrl}", fileUrl);
-                
+                logger.LogInformation("Uploaded {fileUrl} as {actualFileUrl}", fileUrl, actualFileUrl);
                 await scannerQueueChannel.Writer.WriteAsync((actualFileUrl, filePath, callbackUrl));
             }
             else
