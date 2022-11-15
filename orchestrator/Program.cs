@@ -150,6 +150,7 @@ var scannerTask = Task.Run(async () =>
         finally
         {
             isScanning = false;
+            File.Delete(filePath); // Ensure that our tmep file is deleted as we do no longer need it as this point
         }
     }
 });
