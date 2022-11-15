@@ -1,8 +1,8 @@
 #!/bin/bash
-## pass in URL as an environment variable
-URL=$1
+## pass in  path as the first process argument
+FILE=$1
 
-if [ -n "$URL" ]; then
+if [ -n "$FILE" ]; then
     ## set default values
     picklescan=""
     pickescanExitCode=2
@@ -11,27 +11,26 @@ if [ -n "$URL" ]; then
     fileExists=0
 
     ## get file
-    # echo "Scanning $URL"
-    curl -s -f -L -o "model.bin" "$URL"
-    fileExists=$(ls -l model.bin | wc -l)
+    # echo "Scanning $FILE"
+    fileExists=$(ls -l $FILE | wc -l)
 
     ## if file doesn't exist, exit
     if [ $fileExists -eq 0 ]; then
         # echo "File not found"
-        jo -p url="$URL" fileExists="$fileExists" picklescanExitCode="$pickescanExitCode" picklescanOutput="$pickescan" clamscanExitCode="$clamscanExitCode" clamscanOutput="$clamscan"
+        jo -p fileExists="$fileExists" picklescanExitCode="$pickescanExitCode" picklescanOutput="$pickescan" clamscanExitCode="$clamscanExitCode" clamscanOutput="$clamscan"
         exit 1
     fi
 
     ## run scans
     # echo "Running PickleScan"
-    pickescan=$(picklescan -p model.bin -l DEBUG)
+    pickescan=$(picklescan -p $FILE -l DEBUG)
     pickescanExitCode=$?
 
     # echo "Running ClamScan"
-    clamscan=$(clamscan model.bin)
+    clamscan=$(clamscan $FILE)
     clamscanExitCode=$?
 
-    jo -p url="$URL" fileExists="$fileExists" picklescanExitCode="$pickescanExitCode" picklescanOutput="$pickescan" clamscanExitCode="$clamscanExitCode" clamscanOutput="$clamscan"
+    jo -p fileExists="$fileExists" picklescanExitCode="$pickescanExitCode" picklescanOutput="$pickescan" clamscanExitCode="$clamscanExitCode" clamscanOutput="$clamscan"
 else
-    echo "Missing url environment variable"
+    echo "Missing file path argument"
 fi

@@ -6,22 +6,30 @@ using System.Text.RegularExpressions;
 using System.Threading.Channels;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton<CloudStorageService>();
+builder.Services.AddOptions<CloudStorageOptions>()
+    .BindConfiguration(nameof(CloudStorageOptions))
+    .ValidateDataAnnotations();
+
 var app = builder.Build();
 
-
-var scannerQueueChannel = Channel.CreateUnbounded<(string fileUrl, string callbackUrl)>();
+var downloadQueueChannel = Channel.CreateUnbounded<(string fileUrl, string callbackUrl)>();
+var scannerQueueChannel = Channel.CreateUnbounded<(string fileUrl, string filePath, string callbackUrl)>();
 var callbackQueueChannel = Channel.CreateUnbounded<(string callbackUrl, ScanResult result)>();
 
+bool isDownloading = false;
 bool isScanning = false;
 bool isInvokingCallback = false;
 
 app.MapPost("/enqueue", async (string fileUrl, string callbackUrl) =>
 {
-    await scannerQueueChannel.Writer.WriteAsync((fileUrl, callbackUrl));
+    await downloadQueueChannel.Writer.WriteAsync((fileUrl, callbackUrl));
 });
 
 app.MapGet("/", () => new
 {
+    IsDownloading = isDownloading,
+    DownloadQueueSize = downloadQueueChannel.Reader.Count,
     IsScanning = isScanning,
     ScannerQueueSize = scannerQueueChannel.Reader.Count,
     IsInvokingCallback = isInvokingCallback,
@@ -29,12 +37,65 @@ app.MapGet("/", () => new
     Version = 1
 });
 
+var downloadTask = Task.Run(async () =>
+{
+    var cloudStorageService = app.Services.GetRequiredService<CloudStorageService>();
+    var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Downloader");
+    logger.LogInformation("Observing the queue...");
+
+    await foreach (var (fileUrl, callbackUrl) in downloadQueueChannel.Reader.ReadAllAsync())
+    {
+        isDownloading = true;
+        
+        try
+        {
+            logger.LogInformation("Downloading {fileUrl}", fileUrl);
+
+            using var httpClient = new HttpClient();
+            using var fileStream = await httpClient.GetStreamAsync(fileUrl);
+            var filePath = Path.GetTempFileName();
+            using (var tempStream = File.Open(filePath, FileMode.Create))
+            {
+                await fileStream.CopyToAsync(tempStream);
+            }
+
+            if (!cloudStorageService.IsCloudStored(fileUrl))
+            {
+                logger.LogInformation("Uploading {fileUrl} to cloud storage", fileUrl);
+                var actualFileUrl = await cloudStorageService.UploadFile(filePath, Path.GetFileName(fileUrl));
+                logger.LogInformation("Uploaded {fileUrl} as {actualFileUrl}", fileUrl);
+                
+                await scannerQueueChannel.Writer.WriteAsync((actualFileUrl, filePath, callbackUrl));
+            }
+            else
+            {
+                await scannerQueueChannel.Writer.WriteAsync((fileUrl, filePath, callbackUrl));
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.StatusCode is System.Net.HttpStatusCode.NotFound)
+            {
+                await callbackQueueChannel.Writer.WriteAsync((callbackUrl, new ScanResult
+                {
+                    Url = fileUrl,
+                    FileExists = 0
+                }));
+            }
+        }
+        finally
+        {
+            isDownloading = false;
+        }
+    }
+});
+
 var scannerTask = Task.Run(async () =>
 {
     var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Scanner");
     logger.LogInformation("Observing the queue...");
 
-    await foreach (var (fileUrl, callbackUrl) in scannerQueueChannel.Reader.ReadAllAsync())
+    await foreach (var (fileUrl, filePath, callbackUrl) in scannerQueueChannel.Reader.ReadAllAsync())
     {
         try
         {
@@ -46,7 +107,7 @@ var scannerTask = Task.Run(async () =>
 
             var process = new Process
             {
-                StartInfo = new ProcessStartInfo("docker", $"run --rm civitai-model-scanner {fileUrl}")
+                StartInfo = new ProcessStartInfo("docker", $"run -v {filePath}:/data/model.bin --rm civitai-model-scanner /data/model.bin")
                 {
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
@@ -79,6 +140,7 @@ var scannerTask = Task.Run(async () =>
 
             result.PicklescanGlobalImports = ParseGlobalImports(result.PicklescanOutput);
             result.PicklescanDangerousImports = ParseDangerousImports(result.PicklescanOutput);
+            result.Url = fileUrl;
 
             await callbackQueueChannel.Writer.WriteAsync((callbackUrl, result));
         }
@@ -127,11 +189,12 @@ try
 }
 finally
 {
+    downloadQueueChannel.Writer.Complete();
     scannerQueueChannel.Writer.Complete();
     callbackQueueChannel.Writer.Complete();
 }
 
-await Task.WhenAll(scannerTask, callbackTask);
+await Task.WhenAll(downloadTask, scannerTask, callbackTask);
 
 HashSet<string> ParseGlobalImports(string? picklescanOutput)
 {
