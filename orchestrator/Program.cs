@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http.HttpResults;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -12,6 +11,31 @@ builder.Services.AddOptions<CloudStorageOptions>()
     .ValidateDataAnnotations();
 
 var app = builder.Build();
+
+app.Use(async (context, next) =>
+{
+    if (!context.Request.Query.TryGetValue("token", out var token))
+    {
+        context.Response.StatusCode = 401; // Missing authentication token
+        return;
+    }
+
+    var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
+    var validTokensConfiguration = configuration.GetRequiredSection("ValidTokens");
+
+    var isValidToken = validTokensConfiguration
+        .GetChildren()
+        .Select(x => x.Get<string>())
+        .Any(x => string.Equals(x, token, StringComparison.Ordinal));
+        
+    if (!isValidToken)
+    {
+        context.Response.StatusCode = 403; // Invalid token
+        return;
+    }
+
+    await next();
+});
 
 var downloadQueueChannel = Channel.CreateUnbounded<(string fileUrl, string callbackUrl)>();
 var scannerQueueChannel = Channel.CreateUnbounded<(string fileUrl, string filePath, string callbackUrl)>();
@@ -150,7 +174,7 @@ var scannerTask = Task.Run(async () =>
         finally
         {
             isScanning = false;
-            File.Delete(filePath); // Ensure that our tmep file is deleted as we do no longer need it as this point
+            File.Delete(filePath); // Ensure that our temp file is deleted as we do no longer need it as this point
         }
     }
 });
