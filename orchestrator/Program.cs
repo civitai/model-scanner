@@ -34,7 +34,7 @@ app.MapGet("/", () => new
     ScannerQueueSize = scannerQueueChannel.Reader.Count,
     IsInvokingCallback = isInvokingCallback,
     CallbackQueueSize = callbackQueueChannel.Reader.Count,
-    Version = 1
+    Version = 1.1
 });
 
 var downloadTask = Task.Run(async () =>
@@ -46,7 +46,7 @@ var downloadTask = Task.Run(async () =>
     await foreach (var (fileUrl, callbackUrl) in downloadQueueChannel.Reader.ReadAllAsync())
     {
         isDownloading = true;
-        
+
         try
         {
             logger.LogInformation("Downloading {fileUrl}", fileUrl);
