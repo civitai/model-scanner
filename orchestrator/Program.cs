@@ -38,7 +38,7 @@ app.Use(async (context, next) =>
 });
 
 var downloadQueueChannel = Channel.CreateUnbounded<(string fileUrl, string callbackUrl)>();
-var scannerQueueChannel = Channel.CreateUnbounded<(string fileUrl, string filePath, string callbackUrl)>();
+var scannerQueueChannel = Channel.CreateBounded<(string fileUrl, string filePath, string callbackUrl)>(2);
 var callbackQueueChannel = Channel.CreateUnbounded<(string callbackUrl, ScanResult result)>();
 
 bool isDownloading = false;
