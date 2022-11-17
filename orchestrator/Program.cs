@@ -92,7 +92,9 @@ var downloadTask = Task.Run(async () =>
                 await callbackQueueChannel.Writer.WriteAsync((callbackUrl, new ScanResult
                 {
                     Url = actualFileUrl,
-                    FileExists = 1
+                    FileExists = 1,
+                    PicklescanExitCode = -1,
+                    ClamscanExitCode = -1,
                 }));
                 await scannerQueueChannel.Writer.WriteAsync((actualFileUrl, filePath, callbackUrl));
             }
