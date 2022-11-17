@@ -27,7 +27,7 @@ app.Use(async (context, next) =>
         .GetChildren()
         .Select(x => x.Get<string>())
         .Any(x => string.Equals(x, token, StringComparison.Ordinal));
-        
+
     if (!isValidToken)
     {
         context.Response.StatusCode = 403; // Invalid token
@@ -88,6 +88,14 @@ var downloadTask = Task.Run(async () =>
                 logger.LogInformation("Uploading {fileUrl} to cloud storage", fileUrl);
                 var actualFileUrl = await cloudStorageService.UploadFile(filePath, Path.GetFileName(fileUrl));
                 logger.LogInformation("Uploaded {fileUrl} as {actualFileUrl}", fileUrl, actualFileUrl);
+                // Send new cloud url to main
+                await callbackQueueChannel.Writer.WriteAsync((callbackUrl, new ScanResult
+                {
+                    Url = actualFileUrl,
+                    FileExists = 1,
+                    PicklescanExitCode = -1,
+                    ClamscanExitCode = -1,
+                }));
                 await scannerQueueChannel.Writer.WriteAsync((actualFileUrl, filePath, callbackUrl));
             }
             else
