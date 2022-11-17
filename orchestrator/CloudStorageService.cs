@@ -16,6 +16,7 @@ public class CloudStorageService
 {
     readonly AmazonS3Client _amazonS3Client;
     readonly string _uploadBucket;
+    readonly string _baseUrl;
 
     public CloudStorageService(IOptions<CloudStorageOptions> options)
 	{
@@ -23,8 +24,8 @@ public class CloudStorageService
         {
             ServiceURL = options.Value.ServiceUrl
         });
-
         _uploadBucket = options.Value.UploadBucket;
+        _baseUrl = $"{options.Value.ServiceUrl}/{_uploadBucket}/";
     }
 
     public bool IsCloudStored(string fileUrl)
@@ -49,34 +50,9 @@ public class CloudStorageService
         return _amazonS3Client.PutObjectAsync(request);
     }
 
-    async Task<bool> ObjectExists(string key)
-    {
-        try
-        {
-            var response = await _amazonS3Client.GetObjectMetadataAsync(new GetObjectMetadataRequest
-            {
-                BucketName = _uploadBucket,
-                Key = key,
-            });
-
-            return true;
-        }
-        catch (AmazonS3Exception ex)
-            when (ex.ErrorCode == "NotFound")
-        {
-            return false;
-        }
-    }
-
     public async Task<string> UploadFile(string filePath, string suggestedKey)
     {
-        var key = await ObjectExists(suggestedKey) switch
-        {
-            // Garble up some new unique file name
-            true => $"{Path.GetFileNameWithoutExtension(suggestedKey)}-{Path.GetRandomFileName()}{Path.GetExtension(suggestedKey)}",
-            false => suggestedKey
-        };
-
+        var key = $"imported/{Path.GetFileNameWithoutExtension(suggestedKey)}.{Path.GetRandomFileName()}{Path.GetExtension(suggestedKey)}";
         // Try and upload the file with its original name
         var response = await UploadFileInternal(filePath, key);
 
@@ -86,10 +62,6 @@ public class CloudStorageService
         }
 
         // Generate a url. This URL is not pre-signed. Alternative, use:
-        return _amazonS3Client.GetPreSignedURL(new GetPreSignedUrlRequest {
-            BucketName = _uploadBucket,
-            Key = key,
-            Expires = DateTime.UtcNow.AddMinutes(60) // Url is valid for 1 hour. Copied from civitai main platform
-        });
+        return _baseUrl + key;
     }
 }
