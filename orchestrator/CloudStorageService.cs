@@ -43,7 +43,7 @@ public class CloudStorageService
             BucketName = _uploadBucket,
             // DisablePayloadSigning = true must be passed as Cloudflare R2 does not currently support the Streaming SigV4 implementation used by AWSSDK.S3.
             DisablePayloadSigning = true,
-            Key = key
+            Key = "imported/"+key
         };
 
         return _amazonS3Client.PutObjectAsync(request);
