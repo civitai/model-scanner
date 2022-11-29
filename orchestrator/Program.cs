@@ -215,9 +215,21 @@ var callbackTask = Task.Run(async () =>
     }
 });
 
+var appLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("App");
+
 try
 {
-    await app.RunAsync();
+    var appTask = app.RunAsync();
+    await Task.WhenAny(
+        app.RunAsync(),
+        downloadTask,
+        scannerTask,
+        callbackTask
+    );
+}
+catch (AggregateException ex)
+{
+    appLogger.LogError(ex, "Fatal error in one of the sub-tasks");
 }
 finally
 {
