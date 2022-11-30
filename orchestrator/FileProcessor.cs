@@ -54,7 +54,7 @@ class FileProcessor
                 Debug.Assert(actualFileUrl is not null);
 
                 var result = await ScanFileAsync(actualFileUrl, filePath, cancellationToken);
-                await ReportFileAsync(actualFileUrl, result, cancellationToken);
+                await ReportFileAsync(callbackUrl, result, cancellationToken);
             }
         }
         finally
