@@ -3,6 +3,7 @@ using Hangfire.Dashboard;
 using Hangfire.Storage.SQLite;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using ModelScanner;
 using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -86,8 +87,7 @@ app.UseEndpoints(routes =>
 {
     routes.MapHangfireDashboard("", new DashboardOptions
     {
-        Authorization = new IDashboardAuthorizationFilter[] { },
-        AsyncAuthorization = new IDashboardAsyncAuthorizationFilter[] { }
+        Authorization = new IDashboardAuthorizationFilter[] { new AllowAllDashboardAuthorizationFilter() }
     });
 });
 #pragma warning restore ASP0014 // Suggest using top level route registrations
