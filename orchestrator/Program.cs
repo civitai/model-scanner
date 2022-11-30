@@ -84,7 +84,11 @@ app.MapPost("/enqueue", (string fileUrl, string callbackUrl, IBackgroundJobClien
 app.UseRouting();
 app.UseEndpoints(routes =>
 {
-    routes.MapHangfireDashboard("");
+    routes.MapHangfireDashboard("", new DashboardOptions
+    {
+        Authorization = new IDashboardAuthorizationFilter[] { },
+        AsyncAuthorization = new IDashboardAsyncAuthorizationFilter[] { }
+    });
 });
 #pragma warning restore ASP0014 // Suggest using top level route registrations
 
