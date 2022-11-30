@@ -29,7 +29,8 @@ class FileProcessor
             Directory.CreateDirectory(_localStorageOptions.TempFolder);
         }
 
-        var filePath = Path.Combine(_localStorageOptions.TempFolder, Path.GetFileName(fileUrl));
+        var fileUri = new Uri(fileUrl);
+        var filePath = Path.Combine(_localStorageOptions.TempFolder, Path.GetFileName(fileUri.LocalPath));
 
         if (File.Exists(filePath))
         {
