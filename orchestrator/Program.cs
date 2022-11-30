@@ -41,22 +41,29 @@ app.Use(async (context, next) =>
 {
     if (context.User.Identity?.IsAuthenticated != true)
     {
+        var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("TokenAuth");
+
         if (!context.Request.Query.TryGetValue("token", out var token))
         {
+            logger.LogWarning("Expected a token query parameter to be present, none found");
+
             context.Response.StatusCode = 401; // Missing authentication token
             return;
         }
 
         var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
         var validTokensConfiguration = configuration.GetRequiredSection("ValidTokens");
-
-        var isValidToken = validTokensConfiguration
+        var validTokens = validTokensConfiguration
             .GetChildren()
-            .Select(x => x.Get<string>())
+            .Select(x => x.Get<string>());
+
+        var isValidToken = validTokens
             .Any(x => string.Equals(x, token, StringComparison.Ordinal));
 
         if (!isValidToken)
         {
+            logger.LogWarning("The passed in token: {token} was not present in the list of valid tokens: {validTokens}", token, validTokens.ToArray());
+
             context.Response.StatusCode = 403; // Invalid token
             return;
         }
