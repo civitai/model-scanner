@@ -36,7 +36,7 @@ public class CloudStorageService
         return fileUri.Authority.EndsWith(serviceUri.Authority, StringComparison.Ordinal);
     }
 
-    Task<PutObjectResponse> UploadFileInternal(string filePath, string key)
+    Task<PutObjectResponse> UploadFileInternal(string filePath, string key, CancellationToken cancellationToken)
     {
         var request = new PutObjectRequest
         {
@@ -47,14 +47,14 @@ public class CloudStorageService
             Key = key
         };
 
-        return _amazonS3Client.PutObjectAsync(request);
+        return _amazonS3Client.PutObjectAsync(request, cancellationToken);
     }
 
-    public async Task<string> UploadFile(string filePath, string suggestedKey)
+    public async Task<string> UploadFile(string filePath, string suggestedKey, CancellationToken cancellationToken)
     {
         var key = $"imported/{Path.GetFileNameWithoutExtension(suggestedKey)}.{Path.GetRandomFileName()}{Path.GetExtension(suggestedKey)}";
         // Try and upload the file with its original name
-        var response = await UploadFileInternal(filePath, key);
+        var response = await UploadFileInternal(filePath, key, cancellationToken);
 
         if (response.HttpStatusCode is not System.Net.HttpStatusCode.OK)
         {
