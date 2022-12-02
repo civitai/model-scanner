@@ -102,98 +102,119 @@ class FileProcessor
 
     async Task<ScanResult> ScanFileAsync(string fileUrl, string filePath, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Scanning {fileUrl}", fileUrl);
+        const string mounthPath = "/data/model.bin";
 
-        var stopwatch = Stopwatch.StartNew();
+        var result = new ScanResult { Url = fileUrl, FileExists = 1 };
 
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo("docker", $"run -v {filePath}:/data/model.bin --rm civitai-model-scanner /data/model.bin")
-            {
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-            },
-        };
-
-        var outputBuilder = new StringBuilder();
-
-        process.OutputDataReceived += (_, e) =>
-            outputBuilder.Append(e.Data);
-        process.ErrorDataReceived += (_, e) =>
-            outputBuilder.Append(e.Data);
-
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-
-        try
-        {
-            await process.WaitForExitAsync(cancellationToken);
-        }
-        catch(TaskCanceledException)
-        {
-            process.Kill(); // Ensure that we abort the docker process when we cancel quickly
-            throw;
-        }
-
-        var output = outputBuilder.ToString();
-
-        _logger.LogInformation("Scan for {fileUrl} completed in {elapsed}, queuing callback...", fileUrl, stopwatch.Elapsed);
-        _logger.LogInformation(output);
-
-        var result = JsonSerializer.Deserialize<ScanResult>(output, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        })!;
-
-        result.PicklescanGlobalImports = ParseGlobalImports(result.PicklescanOutput);
-        result.PicklescanDangerousImports = ParseDangerousImports(result.PicklescanOutput);
-        result.Url = fileUrl;
+        await RunPickleScan(result);
+        await RunClamScan(result);
 
         return result;
 
-        HashSet<string> ParseGlobalImports(string? picklescanOutput)
+        async Task RunPickleScan(ScanResult result)
         {
-            var result = new HashSet<string>();
+            var (exitCode, output) = await RunCommandInDocker($"picklescan -p {mounthPath} -l DEBUG");
+            
+            result.PicklescanExitCode = exitCode;
+            result.PicklescanOutput = output;
+            result.PicklescanGlobalImports = ParseGlobalImports(output);
+            result.PicklescanDangerousImports = ParseDangerousImports(output);
 
-            if (picklescanOutput is not null)
+            HashSet<string> ParseGlobalImports(string? picklescanOutput)
             {
-                const string globalImportListsRegex = """Global imports in (?:.+): {(.+)}""";
+                var result = new HashSet<string>();
 
-                foreach (Match globalImportListMatch in Regex.Matches(picklescanOutput, globalImportListsRegex))
+                if (picklescanOutput is not null)
                 {
-                    var globalImportList = globalImportListMatch.Groups[1];
-                    const string globalImportsRegex = """\((.+?)\)""";
+                    const string globalImportListsRegex = """Global imports in (?:.+): {(.+)}""";
 
-                    foreach (Match globalImportMatch in Regex.Matches(globalImportList.Value, globalImportsRegex))
+                    foreach (Match globalImportListMatch in Regex.Matches(picklescanOutput, globalImportListsRegex))
                     {
-                        result.Add(globalImportMatch.Groups[1].Value);
+                        var globalImportList = globalImportListMatch.Groups[1];
+                        const string globalImportsRegex = """\((.+?)\)""";
+
+                        foreach (Match globalImportMatch in Regex.Matches(globalImportList.Value, globalImportsRegex))
+                        {
+                            result.Add(globalImportMatch.Groups[1].Value);
+                        }
                     }
                 }
+
+                return result;
             }
 
-            return result;
+            HashSet<string> ParseDangerousImports(string? picklescanOutput)
+            {
+                var result = new HashSet<string>();
+
+                if (picklescanOutput is not null)
+                {
+                    const string dangerousImportsRegex = """dangerous import '(.+)'""";
+                    var dangerousImportMatches = Regex.Matches(picklescanOutput, dangerousImportsRegex);
+
+                    foreach (Match dangerousImporMatch in dangerousImportMatches)
+                    {
+                        var dangerousImport = dangerousImporMatch.Groups[1];
+                        result.Add(dangerousImport.Value);
+                    }
+                }
+
+                return result;
+            }
         }
 
-        HashSet<string> ParseDangerousImports(string? picklescanOutput)
+        async Task RunClamScan(ScanResult result)
         {
-            var result = new HashSet<string>();
+            var (exitCode, output) = await RunCommandInDocker($"clamscan {mounthPath}");
 
-            if (picklescanOutput is not null)
+            result.ClamscanExitCode = exitCode;
+            result.ClamscanOutput = output;
+        }
+
+        async Task<(int exitCode, string output)> RunCommandInDocker(string command)
+        {
+            _logger.LogInformation("Executing {command} for file {fileUrl}", command, fileUrl);
+
+            var stopwatch = Stopwatch.StartNew();
+
+            var process = new Process
             {
-                const string dangerousImportsRegex = """dangerous import '(.+)'""";
-                var dangerousImportMatches = Regex.Matches(picklescanOutput, dangerousImportsRegex);
-
-                foreach (Match dangerousImporMatch in dangerousImportMatches)
+                StartInfo = new ProcessStartInfo("docker", $"run -v {Path.GetFullPath(filePath)}:{mounthPath} --rm civitai-model-scanner {command}")
                 {
-                    var dangerousImport = dangerousImporMatch.Groups[1];
-                    result.Add(dangerousImport.Value);
-                }
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                },
+            };
+
+            var outputBuilder = new StringBuilder();
+
+            process.OutputDataReceived += (_, e) =>
+                outputBuilder.Append(e.Data);
+            process.ErrorDataReceived += (_, e) =>
+                outputBuilder.Append(e.Data);
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken);
+            }
+            catch (TaskCanceledException)
+            {
+                process.Kill(); // Ensure that we abort the docker process when we cancel quickly
+                throw;
             }
 
-            return result;
+            var output = outputBuilder.ToString();
+
+            _logger.LogInformation("Executed {command} for file {fileUrl} completed with exit code {exitCode} in {elapsed}", command, fileUrl, process.ExitCode, stopwatch.Elapsed);
+            _logger.LogInformation(output);
+
+            return (process.ExitCode, output);
         }
     }
 
