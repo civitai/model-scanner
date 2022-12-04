@@ -3,6 +3,7 @@ using Hangfire;
 using Hangfire.Common;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualBasic;
+using ModelScanner;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -30,7 +31,7 @@ class FileProcessor
         }
 
         var fileUri = new Uri(fileUrl);
-        var filePath = Path.Combine(_localStorageOptions.TempFolder, Path.GetFileName(fileUri.LocalPath));
+        var filePath = Path.Combine(_localStorageOptions.TempFolder, Path.GetFileName(fileUri.LocalPath).SafeFilename());
 
         if (File.Exists(filePath))
         {
@@ -102,18 +103,62 @@ class FileProcessor
 
     async Task<ScanResult> ScanFileAsync(string fileUrl, string filePath, CancellationToken cancellationToken)
     {
-        const string mounthPath = "/data/model.bin";
+        const string inPath = "/data/model.bin";
+        const string outPath = "/data/out/";
 
+        var fileExtension = fileUrl.UrlFileExtension();
         var result = new ScanResult { Url = fileUrl, FileExists = 1 };
 
-        await RunPickleScan(result);
         await RunClamScan(result);
+        await RunPickleScan(result);
+        //await RunConversionAsync(result);
+        //await RunModelHasing(result);
 
         return result;
 
+        // TODO Model Conversion: Test locally and ensure we can run on low RAM
+        // TODO Model Conversion: Create conversion scripts
+        // TODO Model Conversion: Update endpoint to handle conversions
+        async Task RunConversionAsync(ScanResult result)
+        {
+            async Task ConvertAndUpload(string targetType)
+            {
+                var (exitCode, output) = await RunCommandInDocker($"python convert/${fileExtension}-to-${targetType}.py -i {inPath} -o {outPath}");
+                if(exitCode == 0 && !string.IsNullOrEmpty(output)) {
+                    var outputFile = Path.Combine(_localStorageOptions.TempFolder, "out", Path.GetFileName(output));
+                    _logger.LogInformation("Uploading {outputFile} to cloud storage", outputFile);
+                    var outputFileUrl = await _cloudStorageService.UploadFile(outputFile, Path.GetFileName(fileUrl), cancellationToken);
+                    _logger.LogInformation("Uploaded {outputFile} as {outputFileUrl}", outputFile, outputFileUrl);
+                    result.Conversions.Add(targetType, outputFileUrl);
+                }
+
+            }
+
+            if (fileExtension == "safetensors") await ConvertAndUpload("pickletensor");
+            else if (fileExtension == "ckpt") await ConvertAndUpload("safetensor");
+        }
+
+        // TODO Model Hash: Test locally and ensure we can run on low RAM
+        // TODO Model Hash: Create hashing scripts (comma deliminate)
+        // TODO Model Conversion: Update endpoint to handle hashes
+        async Task RunModelHasing(ScanResult result)
+        {
+            var (exitCode, output) = await RunCommandInDocker($"python hash-model.py -i {inPath} -o {outPath}");
+            if (exitCode == 0) result.Hashes.AddRange(output.Split(','));
+        }
+
         async Task RunPickleScan(ScanResult result)
         {
-            var (exitCode, output) = await RunCommandInDocker($"picklescan -p {mounthPath} -l DEBUG");
+            // safetensors are safe...
+            if (fileExtension == "safetensors")
+            {
+                result.PicklescanExitCode = 0;
+                result.PicklescanOutput = "safetensors";
+                // TODO Improve Pickle Scan: It probably makes sense to verify that this is indeed a safetensor file
+                return;
+            }
+
+            var (exitCode, output) = await RunCommandInDocker($"picklescan -p {inPath} -l DEBUG");
             
             result.PicklescanExitCode = exitCode;
             result.PicklescanOutput = output;
@@ -165,7 +210,7 @@ class FileProcessor
 
         async Task RunClamScan(ScanResult result)
         {
-            var (exitCode, output) = await RunCommandInDocker($"clamscan {mounthPath}");
+            var (exitCode, output) = await RunCommandInDocker($"clamscan {inPath}");
 
             result.ClamscanExitCode = exitCode;
             result.ClamscanOutput = output;
@@ -177,9 +222,13 @@ class FileProcessor
 
             var stopwatch = Stopwatch.StartNew();
 
+            // Setup directory for writing files when needed
+            var outDir = Path.Combine(_localStorageOptions.TempFolder, "out");
+            Directory.CreateDirectory(outDir);
+
             var process = new Process
             {
-                StartInfo = new ProcessStartInfo("docker", $"run -v {Path.GetFullPath(filePath)}:{mounthPath} --rm civitai-model-scanner {command}")
+                StartInfo = new ProcessStartInfo("docker", $"run -v {Path.GetFullPath(filePath)}:{inPath} -v {Path.GetFullPath(outDir)}:{outPath} --rm civitai-model-scanner {command}")
                 {
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
