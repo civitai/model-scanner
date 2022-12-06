@@ -7,7 +7,7 @@ public static class StringExtensions
     {
         url = url.Split('?')[0];
         url = url.Split('/').Last();
-        return url.Contains('.') ? url.Substring(url.LastIndexOf('.')).ToLower() : "";
+        return url.Contains('.') ? url.Substring(url.LastIndexOf('.')+1).ToLower() : "";
     }
 
     public static string SafeFilename(this string filename)
