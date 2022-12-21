@@ -3,7 +3,11 @@ using Hangfire.Dashboard;
 using Hangfire.Storage.SQLite;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
 using ModelScanner;
+using ModelScanner.CleanupStorage;
+using ModelScanner.Database;
+using ModelScanner.FileProcessor;
 using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,6 +36,12 @@ builder.Services.AddAuthentication(options =>
     options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
     options.RequireAuthenticatedSignIn = false;
 }).AddCookie();
+
+builder.Services
+    .AddDbContext<CivitaiDbContext>(options =>
+    {
+        options.UseNpgsql(builder.Configuration.GetConnectionString("CivitaiDbContext"));
+    });
 
 var app = builder.Build();
 
@@ -78,7 +88,7 @@ app.Use(async (context, next) =>
 
 app.MapPost("/enqueue", (string fileUrl, string callbackUrl, IBackgroundJobClient backgroundJobClient) =>
 {
-    backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFile(fileUrl, callbackUrl, CancellationToken.None));
+    backgroundJobClient.Enqueue<FileProcessorJob>(x => x.ProcessFile(fileUrl, callbackUrl, CancellationToken.None));
 });
 
 #pragma warning disable ASP0014 // Hangfire dashboard is not compatible with top level routing
@@ -92,6 +102,7 @@ app.UseEndpoints(routes =>
 });
 #pragma warning restore ASP0014 // Suggest using top level route registrations
 
+RecurringJob.AddOrUpdate<CleanupStorageJob>(x => x.PerformCleanup(CancellationToken.None), "* * * * *", queue: "cleanup-storage");
 
 await app.RunAsync();
 await app.WaitForShutdownAsync();
