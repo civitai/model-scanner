@@ -3,6 +3,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Options;
 using System.ComponentModel.DataAnnotations;
+using System.Runtime.CompilerServices;
 
 public class CloudStorageOptions
 {
@@ -10,12 +11,14 @@ public class CloudStorageOptions
     [Required] public string SecretKey { get; set; } = default!;
     [Required] public string ServiceUrl { get; set; } = default!;
     [Required] public string UploadBucket { get; set; } = default!;
+    [Required] public string StaleBucket { get; set; } = default!;
 }
 
 public class CloudStorageService
 {
     readonly AmazonS3Client _amazonS3Client;
     readonly string _uploadBucket;
+    readonly string _staleBucket;
     readonly string _baseUrl;
 
     public CloudStorageService(IOptions<CloudStorageOptions> options)
@@ -25,6 +28,7 @@ public class CloudStorageService
             ServiceURL = options.Value.ServiceUrl
         });
         _uploadBucket = options.Value.UploadBucket;
+        _staleBucket = options.Value.StaleBucket;
         _baseUrl = $"{options.Value.ServiceUrl}/{_uploadBucket}/";
     }
 
@@ -63,5 +67,44 @@ public class CloudStorageService
 
         // Generate a url. This URL is not pre-signed. Alternative, use:
         return _baseUrl + key;
+    }
+
+    public async Task<string> SoftDeleteObject(string path, string eTag, CancellationToken cancellationToken)
+    {
+        // First make a copy of the object in the stale bucket
+        var copyResponse = await _amazonS3Client.CopyObjectAsync(new CopyObjectRequest
+        {
+            SourceBucket = _uploadBucket,
+            DestinationBucket = _staleBucket,
+            SourceKey = path,
+            DestinationKey = path,
+            ETagToMatch = eTag
+        }, cancellationToken);
+
+        throw new NotImplementedException();
+    }
+
+    public async IAsyncEnumerable<(string path, DateTime lastModified, string ETag)> ListObjects([EnumeratorCancellation]CancellationToken cancellationToken)
+    {
+        ListObjectsV2Response? response = null;
+
+        do
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            response = await _amazonS3Client.ListObjectsV2Async(new ListObjectsV2Request
+            {
+                BucketName = _uploadBucket,
+                ContinuationToken = response?.NextContinuationToken,
+            }, cancellationToken);
+
+            foreach (var s3Object in response.S3Objects)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                yield return (s3Object.Key, s3Object.LastModified, s3Object.ETag);
+            }
+        }
+        while (response.IsTruncated);
     }
 }

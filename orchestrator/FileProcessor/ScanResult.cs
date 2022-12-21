@@ -1,4 +1,6 @@
-﻿record ScanResult {
+﻿namespace ModelScanner.FileProcessor;
+
+record ScanResult {
     public string? Url { get; set; }
     public int FileExists { get; set; }
     public int PicklescanExitCode { get; set; }

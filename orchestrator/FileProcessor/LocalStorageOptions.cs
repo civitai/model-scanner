@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
+namespace ModelScanner.FileProcessor;
+
 class LocalStorageOptions
 {
     [Required]

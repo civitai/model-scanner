@@ -10,13 +10,15 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-class FileProcessor
+namespace ModelScanner.FileProcessor;
+
+class FileProcessorJob
 {
-    readonly ILogger<FileProcessor> _logger;
+    readonly ILogger<FileProcessorJob> _logger;
     readonly CloudStorageService _cloudStorageService;
     readonly LocalStorageOptions _localStorageOptions;
 
-    public FileProcessor(ILogger<FileProcessor> logger, CloudStorageService cloudStorageService, IOptions<LocalStorageOptions> localStorageOptions)
+    public FileProcessorJob(ILogger<FileProcessorJob> logger, CloudStorageService cloudStorageService, IOptions<LocalStorageOptions> localStorageOptions)
     {
         _logger = logger;
         _cloudStorageService = cloudStorageService;
