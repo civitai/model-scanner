@@ -1,6 +1,8 @@
 ﻿using Amazon.Runtime.Internal;
+using Amazon.Runtime.Internal.Endpoints.StandardLibrary;
 using Hangfire;
 using Hangfire.Common;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualBasic;
 using ModelScanner;
@@ -30,20 +32,11 @@ class FileProcessor
             Directory.CreateDirectory(_localStorageOptions.TempFolder);
         }
 
-        var fileUri = new Uri(fileUrl);
-        var filePath = Path.Combine(_localStorageOptions.TempFolder, Path.GetFileName(fileUri.LocalPath).SafeFilename());
-
-        if (File.Exists(filePath))
-        {
-            _logger.LogWarning("{filePath} already exists, generating a new random file name...", filePath);
-
-            // Randomize a filename if it already exists
-            filePath = Path.Combine(_localStorageOptions.TempFolder, Guid.NewGuid().ToString());
-        }
+        string actualFileUrl, localFilePath = null;
 
         try
         {
-            var actualFileUrl = await PrepareFileAsync(fileUrl, filePath, cancellationToken);
+            (actualFileUrl, localFilePath) = await PrepareFileAsync(fileUrl, cancellationToken);
             if (actualFileUrl is null)
             {
                 await ReportFileAsync(callbackUrl, new ScanResult
@@ -53,43 +46,55 @@ class FileProcessor
             }
             else
             {
-                Debug.Assert(actualFileUrl is not null);
+                Debug.Assert(localFilePath is not null);
 
-                var result = await ScanFileAsync(actualFileUrl, filePath, cancellationToken);
+                var result = await ScanFileAsync(actualFileUrl, localFilePath, cancellationToken);
                 await ReportFileAsync(callbackUrl, result, cancellationToken);
             }
         }
         finally
         {
-            File.Delete(filePath);
+            if (localFilePath is not null)
+            {
+                File.Delete(localFilePath);
+            }
         }
     }
 
-    async Task<string?> PrepareFileAsync(string fileUrl, string filePath, CancellationToken cancellationToken)
+    async Task<(string? actualFileUrl, string? localFilePath)> PrepareFileAsync(string fileUrl, CancellationToken cancellationToken)
     {
         using var httpClient = new HttpClient();
 
         try
         {
-            _logger.LogInformation("Downloading {fileUrl} to {filePath}", fileUrl, filePath);
+            _logger.LogInformation("Downloading {fileUrl}", fileUrl);
 
-            using var fileStream = await httpClient.GetStreamAsync(fileUrl, cancellationToken);
-            using (var tempStream = File.Open(filePath, FileMode.Create))
+            using var response = await httpClient.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            var fileName = response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? Path.GetFileName(fileUrl);
+            var filePath = Path.Combine(_localStorageOptions.TempFolder, fileName);
+
+            if (!Path.Exists(filePath) || _localStorageOptions.AlwaysInvalidate)
             {
-                await fileStream.CopyToAsync(tempStream, cancellationToken);
+                using (var tempStream = File.Open(filePath, FileMode.Create))
+                {
+                    _logger.LogInformation("Temporary storage: {filePath}", filePath);
+
+                    var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    await responseStream.CopyToAsync(tempStream, cancellationToken);
+                }
             }
 
             if (!_cloudStorageService.IsCloudStored(fileUrl))
             {
                 _logger.LogInformation("Uploading {fileUrl} to cloud storage", fileUrl);
-                var actualFileUrl = await _cloudStorageService.UploadFile(filePath, Path.GetFileName(fileUrl), cancellationToken);
+                var actualFileUrl = await _cloudStorageService.ImportFile(filePath, Path.GetFileName(fileUrl), cancellationToken);
                 _logger.LogInformation("Uploaded {fileUrl} as {actualFileUrl}", fileUrl, actualFileUrl);
 
-                return actualFileUrl;
+                return (actualFileUrl, filePath);
             }
             else
             {
-                return fileUrl;
+                return (fileUrl, filePath);
             }
         }
         catch (HttpRequestException ex)
@@ -97,45 +102,72 @@ class FileProcessor
         {
             _logger.LogInformation("{fileUrl} was not found, skipping...", fileUrl);
 
-            return null;
+            return (null, null);
         }
     }
 
     async Task<ScanResult> ScanFileAsync(string fileUrl, string filePath, CancellationToken cancellationToken)
     {
-        const string inPath = "/data/model.bin";
-        const string outPath = "/data/out/";
+        const string inPath = "/data/model.in";
+        const string outPath = "/data/";
 
-        var fileExtension = fileUrl.UrlFileExtension();
+        var fileExtension = Path.GetExtension(filePath);
         var result = new ScanResult { Url = fileUrl, FileExists = 1 };
 
         await RunClamScan(result);
         await RunPickleScan(result);
-        //await RunConversionAsync(result);
-        //await RunModelHasing(result);
+        await RunConversion(result);
+        await RunModelHasing(result);
 
         return result;
 
         // TODO Model Conversion: Test locally and ensure we can run on low RAM
-        // TODO Model Conversion: Create conversion scripts
         // TODO Model Conversion: Update endpoint to handle conversions
-        async Task RunConversionAsync(ScanResult result)
+        async Task RunConversion(ScanResult result)
         {
-            async Task ConvertAndUpload(string targetType)
+            async Task ConvertAndUpload(string fromType, string targetType)
             {
-                var (exitCode, output) = await RunCommandInDocker($"python convert/${fileExtension}-to-${targetType}.py -i {inPath} -o {outPath}");
-                if(exitCode == 0 && !string.IsNullOrEmpty(output)) {
-                    var outputFile = Path.Combine(_localStorageOptions.TempFolder, "out", Path.GetFileName(output));
-                    _logger.LogInformation("Uploading {outputFile} to cloud storage", outputFile);
-                    var outputFileUrl = await _cloudStorageService.UploadFile(outputFile, Path.GetFileName(fileUrl), cancellationToken);
-                    _logger.LogInformation("Uploaded {outputFile} as {outputFileUrl}", outputFile, outputFileUrl);
-                    result.Conversions.Add(targetType, outputFileUrl);
-                }
+                var convertedFilePath = Path.ChangeExtension(filePath, targetType);
 
+                try
+                {
+                    var (exitCode, output) = await RunCommandInDocker($"python3 /convert/{fromType}_to_{targetType}.py {inPath} {outPath}/{Path.GetFileName(convertedFilePath)}");
+                    if (exitCode == 0 && !string.IsNullOrEmpty(output))
+                    {
+                        _logger.LogInformation("Uploading {outputFile} to cloud storage", convertedFilePath);
+                        var outputFileUrl = await _cloudStorageService.ImportFile(convertedFilePath, Path.GetFileName(fileUrl), cancellationToken);
+                        _logger.LogInformation("Uploaded {outputFile} as {outputFileUrl}", convertedFilePath, outputFileUrl);
+                        result.Conversions.Add(targetType, outputFileUrl);
+                    }
+                }
+                finally
+                {
+                    try
+                    {
+                        // Ensure to cleanup after ourselves
+                        File.Delete(convertedFilePath);
+                    }
+                    catch (Exception ex)
+                    { 
+                        _logger.LogError(ex, "Error during cleanup of temporary file");
+                    }
+                }
             }
 
-            if (fileExtension == "safetensors") await ConvertAndUpload("pickletensor");
-            else if (fileExtension == "ckpt") await ConvertAndUpload("safetensor");
+            switch (fileExtension)
+            {
+                case ".ckpt":
+                    await ConvertAndUpload("ckpt", "safetensors");
+                    break;
+
+                case ".safetensors":
+                    await ConvertAndUpload("safetensors", "ckpt");
+                    break;
+
+                default:
+                    _logger.LogInformation("Skipping conversion as there is no explicit conversion defined from {type}", fileExtension);
+                    break;
+            }
         }
 
         // TODO Model Hash: Test locally and ensure we can run on low RAM
@@ -143,7 +175,7 @@ class FileProcessor
         // TODO Model Conversion: Update endpoint to handle hashes
         async Task RunModelHasing(ScanResult result)
         {
-            var (exitCode, output) = await RunCommandInDocker($"python hash-model.py -i {inPath} -o {outPath}");
+            var (exitCode, output) = await RunCommandInDocker($"python3 hash-model.py -i {inPath} -o {outPath}");
             if (exitCode == 0) result.Hashes.AddRange(output.Split(','));
         }
 
@@ -159,7 +191,7 @@ class FileProcessor
             }
 
             var (exitCode, output) = await RunCommandInDocker($"picklescan -p {inPath} -l DEBUG");
-            
+
             result.PicklescanExitCode = exitCode;
             result.PicklescanOutput = output;
             result.PicklescanGlobalImports = ParseGlobalImports(output);
@@ -222,13 +254,9 @@ class FileProcessor
 
             var stopwatch = Stopwatch.StartNew();
 
-            // Setup directory for writing files when needed
-            var outDir = Path.Combine(_localStorageOptions.TempFolder, "out");
-            Directory.CreateDirectory(outDir);
-
             var process = new Process
             {
-                StartInfo = new ProcessStartInfo("docker", $"run -v {Path.GetFullPath(filePath)}:{inPath} -v {Path.GetFullPath(outDir)}:{outPath} --rm civitai-model-scanner {command}")
+                StartInfo = new ProcessStartInfo("docker", $"run -v {Path.GetFullPath(filePath)}:{inPath} -v {Path.GetFullPath(_localStorageOptions.TempFolder)}:{outPath} --rm civitai-model-scanner {command}")
                 {
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,

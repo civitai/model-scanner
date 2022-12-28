@@ -50,10 +50,15 @@ public class CloudStorageService
         return _amazonS3Client.PutObjectAsync(request, cancellationToken);
     }
 
-    public async Task<string> UploadFile(string filePath, string suggestedKey, CancellationToken cancellationToken)
+    public Task<string> ImportFile(string filePath, string suggestedKey, CancellationToken cancellationToken)
     {
         var key = $"imported/{Path.GetFileNameWithoutExtension(suggestedKey)}.{Path.GetRandomFileName()}{Path.GetExtension(suggestedKey)}";
-        // Try and upload the file with its original name
+
+        return UploadFile(filePath, key, cancellationToken);
+    }
+
+    public async Task<string> UploadFile(string filePath, string key, CancellationToken cancellationToken)
+    {
         var response = await UploadFileInternal(filePath, key, cancellationToken);
 
         if (response.HttpStatusCode is not System.Net.HttpStatusCode.OK)
@@ -61,7 +66,7 @@ public class CloudStorageService
             throw new InvalidOperationException($"Expected the upload to have succeeded, got: {response.HttpStatusCode}");
         }
 
-        // Generate a url. This URL is not pre-signed. Alternative, use:
+        // Generate a url. This URL is not pre-signed
         return _baseUrl + key;
     }
 }
