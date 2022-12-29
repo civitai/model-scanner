@@ -1,17 +1,7 @@
-﻿using Amazon.Runtime.Internal;
-using Amazon.Runtime.Internal.Endpoints.StandardLibrary;
-using Hangfire;
-using Hangfire.Common;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Options;
-using Microsoft.VisualBasic;
-using ModelScanner;
+﻿using Microsoft.Extensions.Options;
 using System.Diagnostics;
-using System.Globalization;
-using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 class FileProcessor
@@ -146,7 +136,13 @@ class FileProcessor
                             _logger.LogInformation("Uploading {outputFile} to cloud storage", convertedFilePath);
                             var outputFileUrl = await _cloudStorageService.ImportFile(convertedFilePath, Path.GetFileName(fileUrl), cancellationToken);
                             _logger.LogInformation("Uploaded {outputFile} as {outputFileUrl}", convertedFilePath, outputFileUrl);
-                            result.Conversions.Add(targetType, outputFileUrl);
+
+                            var convertedFileHash = await GenerateSHA256Hash(convertedFilePath);
+
+                            result.Conversions.Add(targetType, new ScanResult.Conversion(outputFileUrl, new Dictionary<string, string>
+                            {
+                                { "SHA256", convertedFileHash }
+                            }));
                         }
                     }
                 }
@@ -184,13 +180,20 @@ class FileProcessor
         // TODO Model Conversion: Update endpoint to handle hashes
         async Task RunModelHasing(ScanResult result)
         {
-            using var fileStream = File.OpenRead(filePath);
+            var hash = await GenerateSHA256Hash(filePath);
             
+            result.Hashes.Add("SHA256", hash);
+        }
+
+        async Task<string> GenerateSHA256Hash(string filePath)
+        {
+            using var fileStream = File.OpenRead(filePath);
+
             var hasher = SHA256.Create();
             Stream openfilestream = File.OpenRead(filePath);
-            var bytehash = hasher.ComputeHash(openfilestream);
-            
-            result.Hashes.Add("SHA256", BitConverter.ToString(bytehash).Replace("-", ""));
+            var bytehash = await hasher.ComputeHashAsync(openfilestream, cancellationToken);
+
+            return BitConverter.ToString(bytehash).Replace("-", "");
         }
 
         async Task RunPickleScan(ScanResult result)
