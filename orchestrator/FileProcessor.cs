@@ -8,6 +8,7 @@ using Microsoft.VisualBasic;
 using ModelScanner;
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -171,12 +172,13 @@ class FileProcessor
         }
 
         // TODO Model Hash: Test locally and ensure we can run on low RAM
-        // TODO Model Hash: Create hashing scripts (comma deliminate)
         // TODO Model Conversion: Update endpoint to handle hashes
         async Task RunModelHasing(ScanResult result)
         {
-            var (exitCode, output) = await RunCommandInDocker($"python3 hash-model.py -i {inPath} -o {outPath}");
-            if (exitCode == 0) result.Hashes.AddRange(output.Split(','));
+            using var fileStream = File.OpenRead(filePath);
+            var sha256 = await SHA256.HashDataAsync(fileStream, cancellationToken);
+
+            result.Hashes.Add("SHA256", BitConverter.ToString(sha256).Replace("-", ""));
         }
 
         async Task RunPickleScan(ScanResult result)
