@@ -72,7 +72,7 @@ class FileProcessor
             _logger.LogInformation("Downloading {fileUrl}", fileUrl);
 
             using var response = await httpClient.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            var fileName = response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? Path.GetFileName(fileUrl);
+            var fileName = response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? Path.GetFileName(new Uri(fileUrl).AbsolutePath);
             var filePath = Path.Combine(_localStorageOptions.TempFolder, fileName);
 
             if (!Path.Exists(filePath) || _localStorageOptions.AlwaysInvalidate)
@@ -136,10 +136,18 @@ class FileProcessor
                     var (exitCode, output) = await RunCommandInDocker($"python3 /convert/{fromType}_to_{targetType}.py {inPath} {outPath}/{Path.GetFileName(convertedFilePath)}");
                     if (exitCode == 0 && !string.IsNullOrEmpty(output))
                     {
-                        _logger.LogInformation("Uploading {outputFile} to cloud storage", convertedFilePath);
-                        var outputFileUrl = await _cloudStorageService.ImportFile(convertedFilePath, Path.GetFileName(fileUrl), cancellationToken);
-                        _logger.LogInformation("Uploaded {outputFile} as {outputFileUrl}", convertedFilePath, outputFileUrl);
-                        result.Conversions.Add(targetType, outputFileUrl);
+                        var convertedFileInfo = new FileInfo(convertedFilePath);
+                        if (!convertedFileInfo.Exists || convertedFileInfo.Length < 1024 * 1024)
+                        {
+                            _logger.LogWarning("Expected an acceptable conversion, got a small file... skipping conversion");
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Uploading {outputFile} to cloud storage", convertedFilePath);
+                            var outputFileUrl = await _cloudStorageService.ImportFile(convertedFilePath, Path.GetFileName(fileUrl), cancellationToken);
+                            _logger.LogInformation("Uploaded {outputFile} as {outputFileUrl}", convertedFilePath, outputFileUrl);
+                            result.Conversions.Add(targetType, outputFileUrl);
+                        }
                     }
                 }
                 finally
