@@ -81,6 +81,13 @@ app.MapPost("/enqueue", (string fileUrl, string callbackUrl, IBackgroundJobClien
     backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFile(fileUrl, callbackUrl, CancellationToken.None));
 });
 
+app.MapPost("/cleanup", (IBackgroundJobClient backgroundJobClient) =>
+{
+    backgroundJobClient.Enqueue<CloudStorageService>(x => x.CleanupTempStorage(default));
+
+    return Results.Accepted();
+});
+
 #pragma warning disable ASP0014 // Hangfire dashboard is not compatible with top level routing
 app.UseRouting();
 app.UseEndpoints(routes =>
@@ -91,7 +98,6 @@ app.UseEndpoints(routes =>
     });
 });
 #pragma warning restore ASP0014 // Suggest using top level route registrations
-
 
 await app.RunAsync();
 await app.WaitForShutdownAsync();

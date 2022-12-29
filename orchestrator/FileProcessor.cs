@@ -8,6 +8,7 @@ using Microsoft.VisualBasic;
 using ModelScanner;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -176,9 +177,12 @@ class FileProcessor
         async Task RunModelHasing(ScanResult result)
         {
             using var fileStream = File.OpenRead(filePath);
-            var sha256 = await SHA256.HashDataAsync(fileStream, cancellationToken);
-
-            result.Hashes.Add("SHA256", BitConverter.ToString(sha256).Replace("-", ""));
+            
+            var hasher = SHA256.Create();
+            Stream openfilestream = File.OpenRead(filePath);
+            var bytehash = hasher.ComputeHash(openfilestream);
+            
+            result.Hashes.Add("SHA256", BitConverter.ToString(bytehash).Replace("-", ""));
         }
 
         async Task RunPickleScan(ScanResult result)
