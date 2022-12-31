@@ -6,7 +6,7 @@
     public HashSet<string>? PicklescanGlobalImports { get; set; }
     public HashSet<string>? PicklescanDangerousImports { get; set; }
     public Dictionary<string, string> Conversions { get; set; } = new();
-    public List<string> Hashes { get; set; } = new();
+    public Dictionary<string,  string> Hashes { get; set; } = new();
     public int ClamscanExitCode { get; set; }
     public string? ClamscanOutput { get; set; }
 }

@@ -1,4 +1,5 @@
 ﻿using Amazon.Runtime.Internal;
+using Amazon.S3.Model.Internal.MarshallTransformations;
 using Hangfire;
 using Hangfire.Common;
 using Microsoft.Extensions.Options;
@@ -6,6 +7,7 @@ using Microsoft.VisualBasic;
 using ModelScanner;
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -112,7 +114,7 @@ class FileProcessor
         await RunClamScan(result);
         await RunPickleScan(result);
         //await RunConversionAsync(result);
-        //await RunModelHasing(result);
+        await RunModelHasing(result);
 
         return result;
 
@@ -143,8 +145,31 @@ class FileProcessor
         // TODO Model Conversion: Update endpoint to handle hashes
         async Task RunModelHasing(ScanResult result)
         {
-            var (exitCode, output) = await RunCommandInDocker($"python hash-model.py -i {inPath} -o {outPath}");
-            if (exitCode == 0) result.Hashes.AddRange(output.Split(','));
+            // A helper method so that we can use stackalloc
+            string ComputeAutoV1Hash(Stream fileStream)
+            {
+                fileStream.Seek(0x100000, SeekOrigin.Begin);
+                Span<byte> buffer = stackalloc byte[0x10000];
+                fileStream.ReadExactly(buffer);
+
+                var hashBytes = SHA256.HashData(buffer);
+                var hash = BitConverter.ToString(hashBytes).Replace("-", string.Empty);
+                
+                var shortHash = hash.Substring(0, 8);
+
+                return shortHash;
+            }
+
+            SHA256 sha256 = SHA256.Create();
+
+            using var fileStream = File.OpenRead(filePath);
+            var sha256HashBytes = SHA256.HashData(fileStream);
+            var sha256HashString = BitConverter.ToString(sha256HashBytes).Replace("-", string.Empty);
+
+            var autov1HashString = ComputeAutoV1Hash(fileStream);
+
+            result.Hashes["SHA256"] = sha256HashString;
+            result.Hashes["AutoV1"] = autov1HashString;
         }
 
         async Task RunPickleScan(ScanResult result)
