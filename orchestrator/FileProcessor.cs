@@ -40,6 +40,8 @@ class FileProcessor
             {
                 Debug.Assert(localFilePath is not null);
 
+                // TODO: Report new file location
+
                 var result = await ScanFileAsync(actualFileUrl, localFilePath, cancellationToken);
                 await ReportFileAsync(callbackUrl, result, cancellationToken);
             }
@@ -79,6 +81,7 @@ class FileProcessor
             if (!_cloudStorageService.IsCloudStored(fileUrl))
             {
                 _logger.LogInformation("Uploading {fileUrl} to cloud storage", fileUrl);
+                // TODO Koen: Preserve filename/folder structure
                 var actualFileUrl = await _cloudStorageService.ImportFile(filePath, Path.GetFileName(fileUrl), cancellationToken);
                 _logger.LogInformation("Uploaded {fileUrl} as {actualFileUrl}", fileUrl, actualFileUrl);
 
@@ -108,8 +111,9 @@ class FileProcessor
 
         await RunClamScan(result);
         await RunPickleScan(result);
+        // TODO: Run this as a dedicated job with a unique endpoint
         await RunConversion(result);
-        await RunModelHasing(result);
+        await RunModelHashing(result);
 
         return result;
 
@@ -151,7 +155,7 @@ class FileProcessor
                     try
                     {
                         // Ensure to cleanup after ourselves
-                        File.Delete(convertedFilePath);
+                         File.Delete(convertedFilePath);
                     }
                     catch (Exception ex)
                     { 
@@ -178,7 +182,7 @@ class FileProcessor
 
         // TODO Model Hash: Test locally and ensure we can run on low RAM
         // TODO Model Conversion: Update endpoint to handle hashes
-        async Task RunModelHasing(ScanResult result)
+        async Task RunModelHashing(ScanResult result)
         {
             var hash = await GenerateSHA256Hash(filePath);
             
@@ -273,6 +277,7 @@ class FileProcessor
 
             var process = new Process
             {
+                // TODO: Double check perf time when constrained to 1cpu and 1024mb mem
                 StartInfo = new ProcessStartInfo("docker", $"run -v {Path.GetFullPath(filePath)}:{inPath} -v {Path.GetFullPath(_localStorageOptions.TempFolder)}:{outPath} --rm civitai-model-scanner {command}")
                 {
                     CreateNoWindow = true,

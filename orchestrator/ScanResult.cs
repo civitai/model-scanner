@@ -10,6 +10,7 @@ record ScanResult {
     public HashSet<string>? PicklescanGlobalImports { get; set; }
     public HashSet<string>? PicklescanDangerousImports { get; set; }
     public Dictionary<string, Conversion> Conversions { get; set; } = new();
+    // [ "AutoV1": "xxxx" ]
     public Dictionary<string, string> Hashes { get; set; } = new();
     public int ClamscanExitCode { get; set; }
     public string? ClamscanOutput { get; set; }

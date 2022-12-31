@@ -8,9 +8,7 @@ newPath = argv[2]
 print(f"Loading {path}")
 
 with torch.no_grad():
-    weights = torch.load(path)
-    if 'state_dict' in weights:
-        weights.pop('state_dict')
-
+    weights = torch.load(path)["state_dict"]
+    
     print(f"Saving {newPath}")    
     save_file(weights, newPath)

@@ -88,6 +88,8 @@ app.MapPost("/cleanup", (IBackgroundJobClient backgroundJobClient) =>
     return Results.Accepted();
 });
 
+// TODO: Add an endpoint to delete a file based on the URL.
+
 #pragma warning disable ASP0014 // Hangfire dashboard is not compatible with top level routing
 app.UseRouting();
 app.UseEndpoints(routes =>
