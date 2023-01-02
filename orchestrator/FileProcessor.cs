@@ -146,8 +146,15 @@ class FileProcessor
         async Task RunModelHasing(ScanResult result)
         {
             // A helper method so that we can use stackalloc
-            string ComputeAutoV1Hash(Stream fileStream)
+            string? ComputeAutoV1Hash(Stream fileStream)
             {
+                const int minFileSize = 0x100000 * 2;
+                if (fileStream.Length < minFileSize)
+                {
+                    // We're unable to compute auto v1 hashes for files that have fewer than the required number of bytes availablbe.
+                    return null;
+                }
+
                 fileStream.Seek(0x100000, SeekOrigin.Begin);
                 Span<byte> buffer = stackalloc byte[0x10000];
                 fileStream.ReadExactly(buffer);
@@ -169,7 +176,10 @@ class FileProcessor
             var autov1HashString = ComputeAutoV1Hash(fileStream);
 
             result.Hashes["SHA256"] = sha256HashString;
-            result.Hashes["AutoV1"] = autov1HashString;
+            if (autov1HashString is not null)
+            {
+                result.Hashes["AutoV1"] = autov1HashString;
+            }
         }
 
         async Task RunPickleScan(ScanResult result)
