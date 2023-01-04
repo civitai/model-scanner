@@ -1,5 +1,10 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Amazon.Runtime.Internal;
+using Amazon.S3.Model.Internal.MarshallTransformations;
+using Hangfire;
+using Hangfire.Common;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -113,7 +118,7 @@ class FileProcessor
         await RunPickleScan(result);
         // TODO: Run this as a dedicated job with a unique endpoint
         await RunConversion(result);
-        await RunModelHashing(result);
+        RunModelHashing(result);
 
         return result;
 
@@ -141,12 +146,9 @@ class FileProcessor
                             var outputFileUrl = await _cloudStorageService.ImportFile(convertedFilePath, Path.GetFileName(fileUrl), cancellationToken);
                             _logger.LogInformation("Uploaded {outputFile} as {outputFileUrl}", convertedFilePath, outputFileUrl);
 
-                            var convertedFileHash = await GenerateSHA256Hash(convertedFilePath);
+                            var hashes = GenerateModelHashes(convertedFilePath);
 
-                            result.Conversions.Add(targetType, new ScanResult.Conversion(outputFileUrl, new Dictionary<string, string>
-                            {
-                                { "SHA256", convertedFileHash }
-                            }));
+                            result.Conversions.Add(targetType, new ScanResult.Conversion(outputFileUrl, hashes));
                         }
                     }
                 }
@@ -182,22 +184,54 @@ class FileProcessor
 
         // TODO Model Hash: Test locally and ensure we can run on low RAM
         // TODO Model Conversion: Update endpoint to handle hashes
-        async Task RunModelHashing(ScanResult result)
+        void RunModelHashing(ScanResult result)
         {
-            var hash = await GenerateSHA256Hash(filePath);
-            
-            result.Hashes.Add("SHA256", hash);
+            var hashes = GenerateModelHashes(filePath);
+
+            result.Hashes = hashes;
         }
 
-        async Task<string> GenerateSHA256Hash(string filePath)
+        Dictionary<string, string> GenerateModelHashes(string filePath)
         {
+            // A helper method so that we can use stackalloc
+            string? ComputeAutoV1Hash(Stream fileStream)
+            {
+                const int minFileSize = 0x100000 * 2;
+                if (fileStream.Length < minFileSize)
+                {
+                    // We're unable to compute auto v1 hashes for files that have fewer than the required number of bytes availablbe.
+                    return null;
+                }
+
+                fileStream.Seek(0x100000, SeekOrigin.Begin);
+                Span<byte> buffer = stackalloc byte[0x10000];
+                fileStream.ReadExactly(buffer);
+
+                var hashBytes = SHA256.HashData(buffer);
+                var hash = BitConverter.ToString(hashBytes).Replace("-", string.Empty);
+
+                var shortHash = hash.Substring(0, 8);
+
+                return shortHash;
+            }
+
+            SHA256 sha256 = SHA256.Create();
+
             using var fileStream = File.OpenRead(filePath);
+            var sha256HashBytes = SHA256.HashData(fileStream);
+            var sha256HashString = BitConverter.ToString(sha256HashBytes).Replace("-", string.Empty);
 
-            var hasher = SHA256.Create();
-            Stream openfilestream = File.OpenRead(filePath);
-            var bytehash = await hasher.ComputeHashAsync(openfilestream, cancellationToken);
+            var autov1HashString = ComputeAutoV1Hash(fileStream);
 
-            return BitConverter.ToString(bytehash).Replace("-", "");
+            var result = new Dictionary<string, string>();
+
+            result["SHA256"] = sha256HashString;
+            if (autov1HashString is not null)
+            {
+                result["AutoV1"] = autov1HashString;
+            }
+
+            return result;
         }
 
         async Task RunPickleScan(ScanResult result)
