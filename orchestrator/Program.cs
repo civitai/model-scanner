@@ -85,7 +85,7 @@ app.Use(async (context, next) =>
 
 app.MapPost("/enqueue", (string fileUrl, string callbackUrl, JobTaskTypes? tasks, IBackgroundJobClient backgroundJobClient) =>
 {
-    backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFile(fileUrl, callbackUrl, tasks ?? JobTaskTypes.All, CancellationToken.None));
+    backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFile(fileUrl, callbackUrl, tasks ?? JobTaskTypes.Default, CancellationToken.None));
 });
 
 app.MapPost("/cleanup", (IBackgroundJobClient backgroundJobClient) =>

@@ -32,6 +32,8 @@ class ConvertTask : IJobTask
                     if (!convertedFileInfo.Exists || convertedFileInfo.Length < 1024 * 1024)
                     {
                         _logger.LogWarning("Expected an acceptable conversion, got a small file... skipping conversion");
+
+                        result.Conversions.Add(targetType, new ScanResult.Conversion(null, null, $"Expected an acceptable conversion, got a small file... skipping conversion; Container output: {output}"));
                     }
                     else
                     {
@@ -41,8 +43,12 @@ class ConvertTask : IJobTask
 
                         var hashes = HashTask.GenerateModelHashes(convertedFilePath);
 
-                        result.Conversions.Add(targetType, new ScanResult.Conversion(outputFileUrl, hashes));
+                        result.Conversions.Add(targetType, new ScanResult.Conversion(outputFileUrl, hashes, output));
                     }
+                }
+                else
+                {
+                    result.Conversions.Add(targetType, new ScanResult.Conversion(null, null, output));
                 }
             }
             finally

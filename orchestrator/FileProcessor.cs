@@ -62,6 +62,12 @@ class FileProcessor
             foreach (var jobTask in _jobTasks)
             {
                 var continueProcessing = await jobTask.Process(filePath, result, cancellationToken);
+                if (!continueProcessing)
+                {
+                    throw new InvalidOperationException("Conversion aborted");
+                }
+
+                await ReportFileAsync(callbackUrl, result, cancellationToken);
             }
         }
         finally

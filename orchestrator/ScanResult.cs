@@ -1,7 +1,7 @@
 ﻿using System.Globalization;
 
 record ScanResult {
-    public record Conversion(string Url, Dictionary<string, string> Hashes);
+    public record Conversion(string? Url, Dictionary<string, string>? Hashes, string ConversionOutput);
 
     public required string Url { get; set; }
     public int FileExists { get; set; }
@@ -10,7 +10,7 @@ record ScanResult {
     public HashSet<string>? PicklescanGlobalImports { get; set; }
     public HashSet<string>? PicklescanDangerousImports { get; set; }
     public Dictionary<string, Conversion> Conversions { get; set; } = new();
-    public Dictionary<string,  string> Hashes { get; set; } = new();
+    public Dictionary<string, string> Hashes { get; set; } = new();
     public int ClamscanExitCode { get; set; }
     public string? ClamscanOutput { get; set; }
 }

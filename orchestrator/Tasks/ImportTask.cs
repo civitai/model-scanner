@@ -24,7 +24,6 @@ class ImportTask : IJobTask
             if (!_cloudStorageService.IsCloudStored(result.Url))
             {
                 _logger.LogInformation("Uploading {fileUrl} to cloud storage", result.Url);
-                // TODO Koen: Preserve filename/folder structure
                 var importedUrl = await _cloudStorageService.ImportFile(filePath, Path.GetFileName(result.Url), cancellationToken);
                 _logger.LogInformation("Uploaded {fileUrl} as {actualFileUrl}", result.Url, importedUrl);
 
