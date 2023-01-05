@@ -4,10 +4,17 @@ using Hangfire.Storage.SQLite;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using ModelScanner;
+using ModelScanner.Tasks;
 using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<CloudStorageService>();
+builder.Services.AddSingleton<DockerService>();
+builder.Services.AddSingleton<IJobTask, ImportTask>();
+builder.Services.AddSingleton<IJobTask, ScanTask>();
+builder.Services.AddSingleton<IJobTask, HashTask>();
+builder.Services.AddSingleton<IJobTask, ConvertTask>();
+
 builder.Services.AddOptions<CloudStorageOptions>()
     .BindConfiguration(nameof(CloudStorageOptions))
     .ValidateDataAnnotations()
@@ -76,9 +83,9 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.MapPost("/enqueue", (string fileUrl, string callbackUrl, IBackgroundJobClient backgroundJobClient) =>
+app.MapPost("/enqueue", (string fileUrl, string callbackUrl, JobTaskTypes? tasks, IBackgroundJobClient backgroundJobClient) =>
 {
-    backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFile(fileUrl, callbackUrl, CancellationToken.None));
+    backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFile(fileUrl, callbackUrl, tasks ?? JobTaskTypes.All, CancellationToken.None));
 });
 
 app.MapPost("/cleanup", (IBackgroundJobClient backgroundJobClient) =>
