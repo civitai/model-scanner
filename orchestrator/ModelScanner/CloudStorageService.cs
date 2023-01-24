@@ -1,6 +1,7 @@
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Hangfire;
 using Microsoft.Extensions.Options;
 using System.ComponentModel.DataAnnotations;
 
@@ -9,8 +10,8 @@ public class CloudStorageOptions
     [Required] public string AccessKey { get; set; } = default!;
     [Required] public string SecretKey { get; set; } = default!;
     [Required] public string ServiceUrl { get; set; } = default!;
-    [Required] public string UploadBucket { get; set; } = default!;
-    [Required] public string TempBucket { get; set; } = default!;
+    [Required] public string UploadBucket { get; set; } = "civitai-prod-new";// default!;
+    [Required] public string TempBucket { get; set; } = "civitai-prod";///default!; =
 
     /// <summary>
     /// A timestamp indicating from what age an object is considered stale in temp storage
@@ -37,8 +38,33 @@ public class CloudStorageService
         _logger = logger;
     }
 
-    public bool IsCloudStored(string fileUrl) 
-        => fileUrl.StartsWith(_baseUrl, StringComparison.OrdinalIgnoreCase);
+    public string? GetCloudStoredBucketName(string fileUrl)
+    {
+        var uri = new Uri(fileUrl);
+        if (uri.Host.StartsWith(_options.UploadBucket, StringComparison.OrdinalIgnoreCase))
+        {
+            return _options.UploadBucket;
+        }
+
+        if (uri.Host.StartsWith(_options.TempBucket, StringComparison.OrdinalIgnoreCase))
+        {
+            return _options.TempBucket;
+        }
+
+        if (uri.AbsolutePath.StartsWith($"/{_options.UploadBucket}", StringComparison.OrdinalIgnoreCase))
+        {
+            return _options.UploadBucket;
+        }
+
+        if (uri.AbsolutePath.StartsWith($"/{_options.TempBucket}", StringComparison.OrdinalIgnoreCase))
+        {
+            return _options.TempBucket;
+        }
+
+        return null;
+    }
+
+    public CloudStorageOptions Options => _options;
 
     Task<PutObjectResponse> UploadFileInternal(string filePath, string key, CancellationToken cancellationToken)
     {
@@ -71,9 +97,10 @@ public class CloudStorageService
         }
 
         // Generate a url. This URL is not pre-signed
-        return _baseUrl + key;
+        return _baseUrl + key.TrimStart('/');
     }
 
+    [Queue("cleanup")]
     public async Task CleanupTempStorage(CancellationToken cancellationToken)
     {
         var staleBeforeDate = DateTime.UtcNow.Subtract(_options.StaleAge);
@@ -120,5 +147,12 @@ public class CloudStorageService
             //    Objects = bulkRequest
             //});
         }
+    }
+
+    [Queue("delete-objects")]
+    public async Task DeleteOject(string key, CancellationToken cancellationToken)
+    {
+        await _amazonS3Client.DeleteObjectAsync(_options.TempBucket, key, cancellationToken);
+        await _amazonS3Client.DeleteObjectAsync(_options.UploadBucket, key, cancellationToken);
     }
 }

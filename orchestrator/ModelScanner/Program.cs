@@ -32,6 +32,7 @@ builder.Services.AddHangfire(options =>
 builder.Services.AddHangfireServer((_, options) =>
 {
     options.WorkerCount = 1;
+    options.Queues = new[] { "default", "cleanup", "delete-objects" };
 }, new SQLiteStorage(builder.Configuration.GetConnectionString("JobStorage")));
 
 builder.Services.AddAuthentication(options =>
@@ -95,7 +96,12 @@ app.MapPost("/cleanup", (IBackgroundJobClient backgroundJobClient) =>
     return Results.Accepted();
 });
 
-// TODO: Add an endpoint to delete a file based on the URL.
+app.MapPost("/delete", (string key, IBackgroundJobClient backgroundJobClient) =>
+{
+    backgroundJobClient.Enqueue<CloudStorageService>(x => x.DeleteOject(key, default));
+
+    return Results.Accepted();
+});
 
 #pragma warning disable ASP0014 // Hangfire dashboard is not compatible with top level routing
 app.UseRouting();

@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33103.184
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModelScanner", "ModelScanner.csproj", "{53497C31-BC45-453E-9577-86EAD7568769}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModelScanner", "ModelScanner\ModelScanner.csproj", "{FA2F0ABD-2424-456E-BDA7-3DE148A9F733}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModelScannerTests", "ModelScannerTests\ModelScannerTests.csproj", "{64D450B6-7438-4DB8-BF8D-A31E91086FF4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +13,14 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{53497C31-BC45-453E-9577-86EAD7568769}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{53497C31-BC45-453E-9577-86EAD7568769}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{53497C31-BC45-453E-9577-86EAD7568769}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{53497C31-BC45-453E-9577-86EAD7568769}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FA2F0ABD-2424-456E-BDA7-3DE148A9F733}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FA2F0ABD-2424-456E-BDA7-3DE148A9F733}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FA2F0ABD-2424-456E-BDA7-3DE148A9F733}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FA2F0ABD-2424-456E-BDA7-3DE148A9F733}.Release|Any CPU.Build.0 = Release|Any CPU
+		{64D450B6-7438-4DB8-BF8D-A31E91086FF4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{64D450B6-7438-4DB8-BF8D-A31E91086FF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{64D450B6-7438-4DB8-BF8D-A31E91086FF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{64D450B6-7438-4DB8-BF8D-A31E91086FF4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

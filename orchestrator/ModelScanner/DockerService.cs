@@ -28,7 +28,6 @@ class DockerService
 
         var process = new Process
         {
-            // TODO: Double check perf time when constrained to 1cpu and 1024mb mem
             StartInfo = new ProcessStartInfo("docker", $"run -v {Path.GetFullPath(filePath)}:{InPath} -v {Path.GetFullPath(_localStorageOptions.TempFolder)}:{OutFolderPath} --rm civitai-model-scanner {command}")
             {
                 CreateNoWindow = true,

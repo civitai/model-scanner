@@ -1,6 +1,6 @@
 ﻿using System.Globalization;
 
-record ScanResult {
+public record ScanResult {
     public record Conversion(string? Url, Dictionary<string, string>? Hashes, string ConversionOutput);
 
     public required string Url { get; set; }
