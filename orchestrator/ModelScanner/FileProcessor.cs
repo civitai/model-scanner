@@ -45,6 +45,14 @@ class FileProcessor
             _logger.LogInformation("Downloading {fileUrl}", fileUrl);
 
             using var response = await httpClient.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (response.StatusCode is System.Net.HttpStatusCode.NotFound)
+            {
+                result.FileExists = 0;
+                await ReportFileAsync(callbackUrl, result, cancellationToken);
+                return;
+            }
+
+            result.FileExists = 1;
             var fileName = response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? Path.GetFileName(new Uri(fileUrl).AbsolutePath);
             filePath = Path.Combine(_localStorageOptions.TempFolder, fileName);
 
