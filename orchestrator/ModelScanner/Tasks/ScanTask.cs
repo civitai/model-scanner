@@ -28,7 +28,7 @@ class ScanTask : IJobTask
         async Task RunPickleScan(ScanResult result)
         {
             // safetensors are safe...
-            if (fileExtension == "safetensors")
+            if (fileExtension.EndsWith("safetensors", StringComparison.OrdinalIgnoreCase))
             {
                 result.PicklescanExitCode = 0;
                 result.PicklescanOutput = "safetensors";
