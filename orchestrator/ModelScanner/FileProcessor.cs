@@ -69,6 +69,12 @@ class FileProcessor
 
             foreach (var jobTask in _jobTasks)
             {
+                if (!tasks.HasFlag(jobTask.TaskType))
+                {
+                    _logger.LogInformation("Skipping over task {jobTask} as it was not requested", jobTask.TaskType);
+                    continue;
+                }
+
                 var continueProcessing = await jobTask.Process(filePath, result, cancellationToken);
                 if (!continueProcessing)
                 {
