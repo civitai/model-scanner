@@ -35,7 +35,7 @@ class ImportTask : IJobTask
                 else
                 {
                     _logger.LogInformation("Copying {fileUrl} to cloud storage", result.Url);
-                    var copiedUrl = await _cloudStorageService.UploadFile(filePath, new Uri(result.Url).AbsolutePath, cancellationToken);
+                    var copiedUrl = await _cloudStorageService.UploadFile(filePath, new Uri(result.Url).AbsolutePath.TrimStart('/'), cancellationToken);
                     _logger.LogInformation("Copying {fileUrl} as {actualFileUrl}", result.Url, copiedUrl);
 
                     result.Url = copiedUrl;
