@@ -24,6 +24,10 @@ class FileProcessor
         _localStorageOptions = options.Value;
     }
 
+    [Queue("low-prio")]
+    public Task ProcessFileLowPrio(string fileUrl, string callbackUrl, JobTaskTypes tasks, CancellationToken cancellationToken)
+        => ProcessFile(fileUrl, callbackUrl, tasks, cancellationToken);
+
     public async Task ProcessFile(string fileUrl, string callbackUrl, JobTaskTypes tasks, CancellationToken cancellationToken)
     {
         if (!Directory.Exists(_localStorageOptions.TempFolder))

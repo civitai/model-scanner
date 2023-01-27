@@ -32,7 +32,7 @@ builder.Services.AddHangfire(options =>
 builder.Services.AddHangfireServer((_, options) =>
 {
     options.WorkerCount = Environment.ProcessorCount;
-    options.Queues = new[] { "default", "cleanup", "delete-objects" };
+    options.Queues = new[] { "default", "cleanup", "delete-objects", "low-prio" };
 }, new SQLiteStorage(builder.Configuration.GetConnectionString("JobStorage")));
 
 builder.Services.AddAuthentication(options =>
@@ -84,9 +84,18 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.MapPost("/enqueue", (string fileUrl, string callbackUrl, JobTaskTypes? tasks, IBackgroundJobClient backgroundJobClient) =>
+app.MapPost("/enqueue", (string fileUrl, string callbackUrl, JobTaskTypes? tasks, bool? lowPrio, IBackgroundJobClient backgroundJobClient) =>
 {
-    backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFile(fileUrl, callbackUrl, tasks ?? JobTaskTypes.Default, CancellationToken.None));
+    if (lowPrio == true)
+    {
+        backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFileLowPrio(fileUrl, callbackUrl, tasks ?? JobTaskTypes.Default, CancellationToken.None));
+    }
+    else
+    {
+        backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFile(fileUrl, callbackUrl, tasks ?? JobTaskTypes.Default, CancellationToken.None));
+    }
+
+    
 });
 
 app.MapPost("/cleanup", (IBackgroundJobClient backgroundJobClient) =>
