@@ -1,4 +1,3 @@
-using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
@@ -68,22 +67,29 @@ public class CloudStorageService
 
     public CloudStorageOptions Options => _options;
 
-    async Task UploadFileInternal(string filePath, string key, CancellationToken cancellationToken)
+    Task<PutObjectResponse> UploadFileInternal(string filePath, string key, CancellationToken cancellationToken)
     {
-        var transferUtility = new TransferUtility(_amazonS3Client);
+        //var transferUtility = new TransferUtility(_amazonS3Client);
+        //transferUtility.UploadAsync(new TransferUtilityUploadRequest
+        //{
+        //    FilePath = filePath,
+        //    BucketName = _options.UploadBucket,
+        //    Key = key,
+        //    // DisablePayloadSigning = true must be passed as Cloudflare R2 does not currently support the Streaming SigV4 implementation used by AWSSDK.S3.
+        //    DisablePayloadSigning = true,
+        //    PartSize = 1024 * 1024 * 100, // 100mb parts (This is a suggested value, not tested for optimal reliability / performance)
+        //}, cancellationToken);
 
-        AWSConfigsS3.UseSignatureVersion4 = true;
-        await transferUtility.UploadAsync(new TransferUtilityUploadRequest
+        var request = new PutObjectRequest
         {
-            FilePath = filePath,
+            FilePath = Path.GetFullPath(filePath),
             BucketName = _options.UploadBucket,
-            Key = key,
             // DisablePayloadSigning = true must be passed as Cloudflare R2 does not currently support the Streaming SigV4 implementation used by AWSSDK.S3.
             DisablePayloadSigning = true,
-            PartSize = 1024 * 1024 * 100, // 100mb parts (This is a suggested value, not tested for optimal reliability / performance)
-            //CalculateContentMD5Header = false,
-            //DisableMD5Stream = true
-        }, cancellationToken);
+            Key = key
+        };
+
+        return _amazonS3Client.PutObjectAsync(request, cancellationToken);
     }
 
     public Task<string> ImportFile(string filePath, string suggestedKey, CancellationToken cancellationToken)
@@ -95,7 +101,12 @@ public class CloudStorageService
 
     public async Task<string> UploadFile(string filePath, string key, CancellationToken cancellationToken)
     {
-        await UploadFileInternal(filePath, key, cancellationToken);
+        var response = await UploadFileInternal(filePath, key, cancellationToken);
+
+        if (response.HttpStatusCode is not System.Net.HttpStatusCode.OK)
+        {
+            throw new InvalidOperationException($"Expected the upload to have succeeded, got: {response.HttpStatusCode}");
+        }
 
         // Generate a url. This URL is not pre-signed
         return _baseUrl + key.TrimStart('/');
