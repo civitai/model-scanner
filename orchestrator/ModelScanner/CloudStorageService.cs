@@ -1,6 +1,8 @@
+using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Amazon.S3.Transfer;
 using Hangfire;
 using Microsoft.Extensions.Options;
 using System.ComponentModel.DataAnnotations;
@@ -66,18 +68,22 @@ public class CloudStorageService
 
     public CloudStorageOptions Options => _options;
 
-    Task<PutObjectResponse> UploadFileInternal(string filePath, string key, CancellationToken cancellationToken)
+    async Task UploadFileInternal(string filePath, string key, CancellationToken cancellationToken)
     {
-        var request = new PutObjectRequest
+        var transferUtility = new TransferUtility(_amazonS3Client);
+
+        AWSConfigsS3.UseSignatureVersion4 = true;
+        await transferUtility.UploadAsync(new TransferUtilityUploadRequest
         {
-            FilePath = Path.GetFullPath(filePath),
+            FilePath = filePath,
             BucketName = _options.UploadBucket,
+            Key = key,
             // DisablePayloadSigning = true must be passed as Cloudflare R2 does not currently support the Streaming SigV4 implementation used by AWSSDK.S3.
             DisablePayloadSigning = true,
-            Key = key
-        };
-
-        return _amazonS3Client.PutObjectAsync(request, cancellationToken);
+            PartSize = 1024 * 1024 * 100, // 100mb parts (This is a suggested value, not tested for optimal reliability / performance)
+            //CalculateContentMD5Header = false,
+            //DisableMD5Stream = true
+        }, cancellationToken);
     }
 
     public Task<string> ImportFile(string filePath, string suggestedKey, CancellationToken cancellationToken)
@@ -89,12 +95,7 @@ public class CloudStorageService
 
     public async Task<string> UploadFile(string filePath, string key, CancellationToken cancellationToken)
     {
-        var response = await UploadFileInternal(filePath, key, cancellationToken);
-
-        if (response.HttpStatusCode is not System.Net.HttpStatusCode.OK)
-        {
-            throw new InvalidOperationException($"Expected the upload to have succeeded, got: {response.HttpStatusCode}");
-        }
+        await UploadFileInternal(filePath, key, cancellationToken);
 
         // Generate a url. This URL is not pre-signed
         return _baseUrl + key.TrimStart('/');
