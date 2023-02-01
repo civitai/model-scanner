@@ -69,17 +69,6 @@ public class CloudStorageService
 
     Task<PutObjectResponse> UploadFileInternal(string filePath, string key, CancellationToken cancellationToken)
     {
-        //var transferUtility = new TransferUtility(_amazonS3Client);
-        //transferUtility.UploadAsync(new TransferUtilityUploadRequest
-        //{
-        //    FilePath = filePath,
-        //    BucketName = _options.UploadBucket,
-        //    Key = key,
-        //    // DisablePayloadSigning = true must be passed as Cloudflare R2 does not currently support the Streaming SigV4 implementation used by AWSSDK.S3.
-        //    DisablePayloadSigning = true,
-        //    PartSize = 1024 * 1024 * 100, // 100mb parts (This is a suggested value, not tested for optimal reliability / performance)
-        //}, cancellationToken);
-
         var request = new PutObjectRequest
         {
             FilePath = Path.GetFullPath(filePath),
@@ -107,6 +96,74 @@ public class CloudStorageService
         {
             throw new InvalidOperationException($"Expected the upload to have succeeded, got: {response.HttpStatusCode}");
         }
+
+        // Generate a url. This URL is not pre-signed
+        return _baseUrl + key.TrimStart('/');
+    }
+
+    public async Task<string> CopyFile(string currentBucket, string key, CancellationToken cancellationToken)
+    {
+        // Create a list to store the copy part responses.
+        var copyResponses = new List<CopyPartResponse>();
+
+        // Setup information required to initiate the multipart upload.
+        var initiateRequest =new InitiateMultipartUploadRequest
+        {
+            BucketName = _options.UploadBucket,
+            Key = key
+        };
+
+        // Initiate the upload.
+        var initResponse = await _amazonS3Client.InitiateMultipartUploadAsync(initiateRequest);
+
+        // Save the upload ID.
+        var uploadId = initResponse.UploadId;
+
+        // Get the size of the object.
+        var metadataRequest = new GetObjectMetadataRequest
+        {
+            BucketName = currentBucket,
+            Key = key
+        };
+
+        var metadataResponse = await _amazonS3Client.GetObjectMetadataAsync(metadataRequest);
+        var objectSize = metadataResponse.ContentLength; // Length in bytes.
+
+        // Copy the parts.
+        long partSize = 100 * (long)Math.Pow(2, 20); // Part size is 100 MB.
+        long bytePosition = 0;
+           
+        for (var i = 1; bytePosition < objectSize; i++)
+        {
+            CopyPartRequest copyRequest = new CopyPartRequest
+            {
+                DestinationBucket = _options.UploadBucket,
+                DestinationKey = key,
+                SourceBucket = currentBucket,
+                SourceKey = key,
+                UploadId = uploadId,
+                FirstByte = bytePosition,
+                LastByte = bytePosition + partSize - 1 >= objectSize ? objectSize - 1 : bytePosition + partSize - 1,
+                PartNumber = i
+            };
+
+            copyResponses.Add(await _amazonS3Client.CopyPartAsync(copyRequest));
+
+            bytePosition += partSize;
+        }
+
+        // Set up to complete the copy.
+        var completeRequest = new CompleteMultipartUploadRequest
+        {
+            BucketName = _options.UploadBucket,
+            Key = key,
+            UploadId = initResponse.UploadId
+        };
+
+        completeRequest.AddPartETags(copyResponses);
+
+        // Complete the copy.
+        await _amazonS3Client.CompleteMultipartUploadAsync(completeRequest);
 
         // Generate a url. This URL is not pre-signed
         return _baseUrl + key.TrimStart('/');
