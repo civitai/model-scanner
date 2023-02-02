@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Collections.Generic;
 using System.IO.Hashing;
 using System.Security.Cryptography;
 
@@ -6,6 +7,13 @@ namespace ModelScanner.Tasks;
 
 public class HashTask : IJobTask
 {
+    readonly ILogger<HashTask> _logger;
+
+    public HashTask(ILogger<HashTask> logger)
+    {
+        _logger = logger;
+    }
+
     public JobTaskTypes TaskType => JobTaskTypes.Hash;
 
     public static Dictionary<string, string> GenerateModelHashes(string filePath)
@@ -69,6 +77,10 @@ public class HashTask : IJobTask
     public Task<bool> Process(string filePath, ScanResult result, CancellationToken cancellationToken)
     {
         var hashes = GenerateModelHashes(filePath);
+
+        _logger.LogInformation("Generated {hashes} for {filePath}",
+            string.Join(',', hashes),
+            filePath);            
 
         result.Hashes = hashes;
 
