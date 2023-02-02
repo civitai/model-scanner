@@ -80,6 +80,7 @@ class FileProcessor
                     continue;
                 }
 
+                _logger.LogInformation("Executing {jobTask}", jobTask.TaskType);
                 var continueProcessing = await jobTask.Process(filePath, result, cancellationToken);
                 if (!continueProcessing)
                 {
