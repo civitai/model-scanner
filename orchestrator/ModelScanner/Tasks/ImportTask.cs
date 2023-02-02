@@ -34,11 +34,27 @@ class ImportTask : IJobTask
                 }
                 else
                 {
-                    _logger.LogInformation("Copying {fileUrl} to cloud storage", result.Url);
-                    var copiedUrl = await _cloudStorageService.CopyFile(currentBucket, new Uri(result.Url).AbsolutePath.TrimStart('/'), cancellationToken);
-                    _logger.LogInformation("Copying {fileUrl} as {actualFileUrl}", result.Url, copiedUrl);
+                    var fileSize = new FileInfo(filePath).Length;
+                    var objectKey = new Uri(result.Url).AbsolutePath.TrimStart('/');
 
-                    result.Url = copiedUrl;
+                    // We're going to straight upload small files while copying over larger files
+                    // This is as a workaround to R2 storage not allowing direct copying and failing on small multipart copies
+                    if (fileSize <= 100 * 1024 * 1024)
+                    {
+                        _logger.LogInformation("Uploading {fileUrl} to cloud storage", result.Url);
+                        var uploadedUrl = await _cloudStorageService.UploadFile(filePath, objectKey, cancellationToken);
+                        _logger.LogInformation("Uploading {fileUrl} as {actualFileUrl}", result.Url, uploadedUrl);
+
+                        result.Url = uploadedUrl;
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Copying {fileUrl} to cloud storage", result.Url);
+                        var copiedUrl = await _cloudStorageService.CopyFile(currentBucket, objectKey, cancellationToken);
+                        _logger.LogInformation("Copying {fileUrl} as {actualFileUrl}", result.Url, copiedUrl);
+
+                        result.Url = copiedUrl;
+                    }
                 }
             }
         }
