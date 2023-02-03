@@ -37,8 +37,11 @@ class ConvertTask : IJobTask
                     }
                     else
                     {
+                        var objectKey = new Uri(result.Url).AbsolutePath.TrimStart('/');
+                        var convertedObjectKey = Path.ChangeExtension(objectKey, targetType);
+
                         _logger.LogInformation("Uploading {outputFile} to cloud storage", convertedFilePath);
-                        var outputFileUrl = await _cloudStorageService.ImportFile(convertedFilePath, Path.GetFileName(filePath), cancellationToken);
+                        var outputFileUrl = await _cloudStorageService.UploadFile(convertedFilePath, convertedObjectKey, cancellationToken);
                         _logger.LogInformation("Uploaded {outputFile} as {outputFileUrl}", convertedFilePath, outputFileUrl);
 
                         var hashes = HashTask.GenerateModelHashes(convertedFilePath);
