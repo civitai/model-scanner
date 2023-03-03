@@ -210,11 +210,11 @@ public class CloudStorageService
                 });
             }
 
-            //await _amazonS3Client.DeleteObjectsAsync(new DeleteObjectsRequest
-            //{
-            //    BucketName = _options.TempBucket,
-            //    Objects = bulkRequest
-            //});
+            await _amazonS3Client.DeleteObjectsAsync(new DeleteObjectsRequest
+            {
+                BucketName = _options.TempBucket,
+                Objects = bulkRequest
+            });
         }
     }
 

@@ -1,4 +1,6 @@
-﻿using ModelScanner.Tasks;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using ModelScanner.Tasks;
 using ScenarioTests;
 using System;
 using System.Collections.Generic;
@@ -17,7 +19,7 @@ public partial class HashTaskTests
     {
         var filePath = Path.Combine(typeof(HashTaskTests).Assembly.Location, "dummy.txt");
 
-        var subject = new HashTask();
+        var subject = new HashTask(NullLogger<HashTask>.Instance);
         var result = new ScanResult()
         {
             Url = filePath
