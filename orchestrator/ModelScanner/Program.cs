@@ -14,6 +14,7 @@ builder.Services.AddSingleton<IJobTask, ImportTask>();
 builder.Services.AddSingleton<IJobTask, ScanTask>();
 builder.Services.AddSingleton<IJobTask, HashTask>();
 builder.Services.AddSingleton<IJobTask, ConvertTask>();
+builder.Services.AddSingleton<IJobTask, ParseMetadataTask>();
 
 builder.Services.AddOptions<CloudStorageOptions>()
     .BindConfiguration(nameof(CloudStorageOptions))
@@ -94,8 +95,6 @@ app.MapPost("/enqueue", (string fileUrl, string callbackUrl, JobTaskTypes? tasks
     {
         backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFile(fileUrl, callbackUrl, tasks ?? JobTaskTypes.Default, CancellationToken.None));
     }
-
-    
 });
 
 app.MapPost("/cleanup", (IBackgroundJobClient backgroundJobClient) =>

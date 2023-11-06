@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Text.Json;
 
 public record ScanResult {
     public record Conversion(string? Url, Dictionary<string, string>? Hashes, string ConversionOutput);
@@ -11,6 +12,7 @@ public record ScanResult {
     public HashSet<string>? PicklescanDangerousImports { get; set; }
     public Dictionary<string, Conversion> Conversions { get; set; } = new();
     public Dictionary<string, string> Hashes { get; set; } = new();
+    public JsonDocument? metadata { get; set; }
     public int ClamscanExitCode { get; set; }
     public string? ClamscanOutput { get; set; }
 }
