@@ -7,8 +7,7 @@ public enum JobTaskTypes
     Convert = 2,
     Scan = 4,
     Hash = 8,
-
     ParseMetadata = 16,
-    Default = Import | Hash | Scan,
+    Default = Import | Hash | Scan | ParseMetadata,
     All = Import | Convert | Scan | Hash | ParseMetadata
 }

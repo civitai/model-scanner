@@ -31,7 +31,7 @@ public class ParseMetadataTask: IJobTask
     fileStream.ReadExactly(metadataBuffer);
 
     var metadataJson = JsonSerializer.Deserialize<JsonDocument>(metadataBuffer);
-    result.metadata = metadataJson;
+    result.Metadata = metadataJson;
 
     return Task.FromResult(true);
   }
