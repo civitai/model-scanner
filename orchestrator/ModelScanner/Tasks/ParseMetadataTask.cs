@@ -19,7 +19,8 @@ public class ParseMetadataTask: IJobTask
 
     if (fileExtension != ".safetensors") {
       _logger.LogInformation("Skipping parsing of metadata for {type} files. Safetensor file required", fileExtension);
-      return Task.FromResult(false);
+      // Bail early but return true to continue with additional tasks
+      return Task.FromResult(true);
     }
 
     using var fileStream = File.OpenRead(filePath);
