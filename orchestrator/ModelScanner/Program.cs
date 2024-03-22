@@ -28,12 +28,16 @@ builder.Services.AddOptions<LocalStorageOptions>()
     .ValidateOnStart();
 
 var connectionString = builder.Configuration.GetConnectionString("JobStorage");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    connectionString = null;
+}
 
 builder.Services.AddHangfire(options =>
 {
     if (connectionString is not null)
     {
-        options.UseSQLiteStorage(builder.Configuration.GetConnectionString("JobStorage"));
+        options.UseSQLiteStorage(connectionString);
     }
     else
     {
@@ -44,7 +48,7 @@ builder.Services.AddHangfireServer((_, options) =>
 {
     options.WorkerCount = builder.Configuration.GetValue<int?>("Concurrency") ?? Environment.ProcessorCount;
     options.Queues = new[] { "default", "cleanup", "delete-objects", "low-prio" };
-}, connectionString is not null ? new SQLiteStorage(builder.Configuration.GetConnectionString("JobStorage")) : new InMemoryStorage());
+}, connectionString is not null ? new SQLiteStorage(connectionString) : new InMemoryStorage());
 
 builder.Services.AddAuthentication(options =>
 {
