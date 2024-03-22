@@ -1,5 +1,6 @@
 using Hangfire;
 using Hangfire.Dashboard;
+using Hangfire.InMemory;
 using Hangfire.Storage.SQLite;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -26,15 +27,24 @@ builder.Services.AddOptions<LocalStorageOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+var connectionString = builder.Configuration.GetConnectionString("JobStorage");
+
 builder.Services.AddHangfire(options =>
 {
-    options.UseSQLiteStorage(builder.Configuration.GetConnectionString("JobStorage"));
+    if (connectionString is not null)
+    {
+        options.UseSQLiteStorage(builder.Configuration.GetConnectionString("JobStorage"));
+    }
+    else
+    {
+        options.UseInMemoryStorage();
+    }
 });
 builder.Services.AddHangfireServer((_, options) =>
 {
     options.WorkerCount = builder.Configuration.GetValue<int?>("Concurrency") ?? Environment.ProcessorCount;
     options.Queues = new[] { "default", "cleanup", "delete-objects", "low-prio" };
-}, new SQLiteStorage(builder.Configuration.GetConnectionString("JobStorage")));
+}, connectionString is not null ? new SQLiteStorage(builder.Configuration.GetConnectionString("JobStorage")) : new InMemoryStorage());
 
 builder.Services.AddAuthentication(options =>
 {
