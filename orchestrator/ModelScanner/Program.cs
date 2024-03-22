@@ -48,7 +48,7 @@ builder.Services.AddHangfireServer((_, options) =>
 {
     options.WorkerCount = builder.Configuration.GetValue<int?>("Concurrency") ?? Environment.ProcessorCount;
     options.Queues = new[] { "default", "cleanup", "delete-objects", "low-prio" };
-}, connectionString is not null ? new SQLiteStorage(connectionString) : new InMemoryStorage());
+});
 
 builder.Services.AddAuthentication(options =>
 {
