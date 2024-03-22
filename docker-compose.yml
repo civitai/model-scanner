@@ -11,8 +11,6 @@ services:
       context: ./orchestrator/ModelScanner/
       dockerfile: Dockerfile
     restart: always
-    environment:
-      - "ConnectionStrings:JobStorage=/data/jobs.db"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - db:/data/
