@@ -32,7 +32,7 @@ builder.Services.AddHangfire(options =>
 });
 builder.Services.AddHangfireServer((_, options) =>
 {
-    options.WorkerCount = Environment.ProcessorCount;
+    options.WorkerCount = builder.Configuration.GetValue<int?>("Concurrency") ?? Environment.ProcessorCount;
     options.Queues = new[] { "default", "cleanup", "delete-objects", "low-prio" };
 }, new SQLiteStorage(builder.Configuration.GetConnectionString("JobStorage")));
 
