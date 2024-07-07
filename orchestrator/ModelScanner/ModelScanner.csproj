@@ -11,8 +11,9 @@
     <PackageReference Include="AWSSDK.S3" Version="3.7.101.16" />
     <PackageReference Include="Blake3" Version="0.5.1" />
     <PackageReference Include="Crc32.NET" Version="1.2.0" />
-    <PackageReference Include="Hangfire.AspNetCore" Version="1.7.32" />
-    <PackageReference Include="Hangfire.Storage.SQLite" Version="0.3.2" />
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.11" />
+    <PackageReference Include="Hangfire.InMemory" Version="0.8.1" />
+    <PackageReference Include="Hangfire.Storage.SQLite" Version="0.4.1" />
     <PackageReference Include="System.IO.Hashing" Version="7.0.0" />
   </ItemGroup>
 
