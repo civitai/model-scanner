@@ -104,6 +104,8 @@ class FileProcessor
         using var httpClient = new HttpClient();
 
         _logger.LogInformation("Invoking {callbackUrl} with result {result}", callbackUrl, result);
-        await httpClient.PostAsJsonAsync(callbackUrl, result, cancellationToken);
+        var response = await httpClient.PostAsJsonAsync(callbackUrl, result, cancellationToken);
+
+        response.EnsureSuccessStatusCode();
     }
 }
