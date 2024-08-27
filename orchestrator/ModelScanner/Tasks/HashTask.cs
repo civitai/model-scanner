@@ -38,14 +38,26 @@ public class HashTask : IJobTask
         var metadataLength = BitConverter.ToUInt64(metadataLengthBuffer, 0);
 
         // Extract the metadata
-        var metadataBytes = new byte[metadataLength];
-        fileStream.ReadExactly(metadataBytes);
+        const int maxMetadataLength = 1024 * 1024 * 16; // 16MB
+        byte[] metadataBytes = Array.Empty<byte>();
+        if (metadataLength < maxMetadataLength)
+        {
+            metadataBytes = new byte[metadataLength];
+            fileStream.ReadExactly(metadataBytes);
+        }
+
 
         // Hash the rest of the file
         var hashBytes = SHA256.HashData(fileStream);
 
         // Convert the hash to a readable string
         var hashString = BitConverter.ToString(hashBytes).Replace("-", string.Empty);
+
+        // Return early if we didn't parse the metadata
+        if (metadataBytes.Length == 0)
+        {
+            return hashString;
+        }
 
         // Deserialize the metadata
         try
