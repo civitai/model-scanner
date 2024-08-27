@@ -19,7 +19,7 @@ public partial class HashTaskTests
     {
         var filePath = Path.Combine(typeof(HashTaskTests).Assembly.Location, "dummy.txt");
 
-        var subject = new HashTask(NullLogger<HashTask>.Instance);
+        var subject = new HashTask(NullLogger<HashTask>.Instance, default!);
         var result = new ScanResult()
         {
             Url = filePath

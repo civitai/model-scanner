@@ -15,4 +15,5 @@ public record ScanResult {
     public JsonDocument? Metadata { get; set; }
     public int ClamscanExitCode { get; set; }
     public string? ClamscanOutput { get; set; }
+    public HashSet<string>? Fixed { get; set; }
 }

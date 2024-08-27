@@ -20,7 +20,7 @@ class FileProcessor
     public FileProcessor(ILogger<FileProcessor> logger, IEnumerable<IJobTask> jobTasks, IOptions<LocalStorageOptions> options)
     {
         _logger = logger;
-        _jobTasks = jobTasks.ToArray();
+        _jobTasks = jobTasks.OrderBy(x => x.TaskType is JobTaskTypes.Hash ? 0 : 1).ToArray(); // Ensure to hash first as this may modify the file
         _localStorageOptions = options.Value;
     }
 
@@ -63,13 +63,11 @@ class FileProcessor
 
             if (!Path.Exists(filePath) || _localStorageOptions.AlwaysInvalidate)
             {
-                using (var tempStream = File.Open(filePath, FileMode.Create))
-                {
-                    _logger.LogInformation("Temporary storage: {filePath}", filePath);
+                using var tempStream = File.Open(filePath, FileMode.Create);
+                _logger.LogInformation("Temporary storage: {filePath}", filePath);
 
-                    var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                    await responseStream.CopyToAsync(tempStream, cancellationToken);
-                }
+                var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                await responseStream.CopyToAsync(tempStream, cancellationToken);
             }
 
             foreach (var jobTask in _jobTasks)

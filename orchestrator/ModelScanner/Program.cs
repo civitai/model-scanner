@@ -13,7 +13,8 @@ builder.Services.AddSingleton<CloudStorageService>();
 builder.Services.AddSingleton<DockerService>();
 builder.Services.AddSingleton<IJobTask, ImportTask>();
 builder.Services.AddSingleton<IJobTask, ScanTask>();
-builder.Services.AddSingleton<IJobTask, HashTask>();
+builder.Services.AddSingleton<HashTask>();
+builder.Services.AddSingleton<IJobTask>(sp => sp.GetRequiredService<HashTask>());
 builder.Services.AddSingleton<IJobTask, ConvertTask>();
 builder.Services.AddSingleton<IJobTask, ParseMetadataTask>();
 

@@ -101,13 +101,36 @@ public class CloudStorageService
         return _baseUrl + key.TrimStart('/');
     }
 
+    public async Task<string> UploadFile(FileStream fileStream, string key, CancellationToken cancellationToken)
+    {
+        var request = new PutObjectRequest
+        {
+            InputStream = fileStream,
+            AutoCloseStream = false,
+            BucketName = _options.UploadBucket,
+            // DisablePayloadSigning = true must be passed as Cloudflare R2 does not currently support the Streaming SigV4 implementation used by AWSSDK.S3.
+            DisablePayloadSigning = true,
+            Key = key
+        };
+
+        var response = await _amazonS3Client.PutObjectAsync(request, cancellationToken);
+
+        if (response.HttpStatusCode is not System.Net.HttpStatusCode.OK)
+        {
+            throw new InvalidOperationException($"Expected the upload to have succeeded, got: {response.HttpStatusCode}");
+        }
+
+        // Generate a url. This URL is not pre-signed
+        return _baseUrl + key.TrimStart('/');
+    }
+
     public async Task<string> CopyFile(string currentBucket, string key, CancellationToken cancellationToken)
     {
         // Create a list to store the copy part responses.
         var copyResponses = new List<CopyPartResponse>();
 
         // Setup information required to initiate the multipart upload.
-        var initiateRequest =new InitiateMultipartUploadRequest
+        var initiateRequest = new InitiateMultipartUploadRequest
         {
             BucketName = _options.UploadBucket,
             Key = key

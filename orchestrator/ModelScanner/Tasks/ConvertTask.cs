@@ -5,12 +5,14 @@ namespace ModelScanner.Tasks;
 class ConvertTask : IJobTask
 {
     readonly ILogger<ConvertTask> _logger;
+    readonly HashTask _hashTask;
     readonly DockerService _dockerService;
     readonly CloudStorageService _cloudStorageService;
 
-    public ConvertTask(ILogger<ConvertTask> logger, DockerService dockerService, CloudStorageService cloudStorageService)
+    public ConvertTask(ILogger<ConvertTask> logger, HashTask hashTask, DockerService dockerService, CloudStorageService cloudStorageService)
     {
         _logger = logger;
+        _hashTask = hashTask;
         _dockerService = dockerService;
         _cloudStorageService = cloudStorageService;
     }
@@ -44,7 +46,7 @@ class ConvertTask : IJobTask
                         var outputFileUrl = await _cloudStorageService.UploadFile(convertedFilePath, convertedObjectKey, cancellationToken);
                         _logger.LogInformation("Uploaded {outputFile} as {outputFileUrl}", convertedFilePath, outputFileUrl);
 
-                        var hashes = HashTask.GenerateModelHashes(convertedFilePath);
+                        var hashes = await _hashTask.GenerateModelHashes(convertedFilePath, result);
 
                         result.Conversions.Add(targetType, new ScanResult.Conversion(outputFileUrl, hashes, output));
                     }
