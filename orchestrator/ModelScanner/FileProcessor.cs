@@ -28,6 +28,11 @@ class FileProcessor
     public Task ProcessFileLowPrio(string fileUrl, string callbackUrl, JobTaskTypes tasks, CancellationToken cancellationToken)
         => ProcessFile(fileUrl, callbackUrl, tasks, cancellationToken);
 
+
+    [Queue("x-low-prio"), AutomaticRetry(Attempts = 1)]
+    public Task ProcessFileExtraLowPrio(string fileUrl, string callbackUrl, JobTaskTypes tasks, CancellationToken cancellationToken)
+        => ProcessFile(fileUrl, callbackUrl, tasks, cancellationToken);
+
     [AutomaticRetry(Attempts = 1)]
     public async Task ProcessFile(string fileUrl, string callbackUrl, JobTaskTypes tasks, CancellationToken cancellationToken)
     {

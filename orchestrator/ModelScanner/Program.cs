@@ -48,7 +48,7 @@ builder.Services.AddHangfire(options =>
 builder.Services.AddHangfireServer((_, options) =>
 {
     options.WorkerCount = builder.Configuration.GetValue<int?>("Concurrency") ?? Environment.ProcessorCount;
-    options.Queues = new[] { "default", "cleanup", "delete-objects", "low-prio" };
+    options.Queues = new[] { "default", "cleanup", "delete-objects", "low-prio", "x-low-prio" };
 });
 
 builder.Services.AddAuthentication(options =>
@@ -100,9 +100,14 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.MapPost("/enqueue", (string fileUrl, string callbackUrl, JobTaskTypes? tasks, bool? lowPrio, IBackgroundJobClient backgroundJobClient) =>
+app.MapPost("/enqueue", (string fileUrl, string callbackUrl, JobTaskTypes? tasks, bool? lowPrio, bool? extraLowPrio, IBackgroundJobClient backgroundJobClient) =>
 {
-    if (lowPrio == true)
+
+    if (extraLowPrio == true)
+    {
+        backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFileExtraLowPrio(fileUrl, callbackUrl, tasks ?? JobTaskTypes.Default, CancellationToken.None));
+    }
+    else if (lowPrio == true)
     {
         backgroundJobClient.Enqueue<FileProcessor>(x => x.ProcessFileLowPrio(fileUrl, callbackUrl, tasks ?? JobTaskTypes.Default, CancellationToken.None));
     }
