@@ -48,7 +48,10 @@ class ConvertTask : IJobTask
 
                         var hashes = await _hashTask.GenerateModelHashes(convertedFilePath, result);
 
-                        result.Conversions.Add(targetType, new ScanResult.Conversion(outputFileUrl, hashes, output));
+                        result.Conversions.Add(targetType, new ScanResult.Conversion(outputFileUrl, hashes, output)
+                        {
+                            SizeKB = new FileInfo(convertedFilePath).Length / 1024D
+                        });
                     }
                 }
                 else

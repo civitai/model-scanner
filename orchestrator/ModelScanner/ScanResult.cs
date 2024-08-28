@@ -1,8 +1,14 @@
 ﻿using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 public record ScanResult {
-    public record Conversion(string? Url, Dictionary<string, string>? Hashes, string ConversionOutput);
+    public record Conversion(string? Url, Dictionary<string, string>? Hashes, string ConversionOutput)
+    {
+        [JsonPropertyName("sizeKB")]
+        public double? SizeKB { get; set; }
+    }
+        
 
     public required string Url { get; set; }
     public int FileExists { get; set; }
