@@ -74,6 +74,7 @@ class ConvertTask : IJobTask
 
         switch (fileExtension)
         {
+            case ".pt":
             case ".ckpt":
                 await ConvertAndUpload("ckpt", "safetensors");
                 break;
