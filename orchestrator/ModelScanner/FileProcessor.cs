@@ -64,6 +64,11 @@ class FileProcessor
 
             result.FileExists = 1;
             var fileName = response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? Path.GetFileName(new Uri(fileUrl).AbsolutePath);
+            var fileNameLength = Encoding.ASCII.GetByteCount(fileName);
+            if (fileNameLength > 30)
+            {
+                fileName = $"{fileName[..30]}-{Guid.NewGuid()}";
+            }
             filePath = Path.Combine(_localStorageOptions.TempFolder, fileName);
 
             if (!Path.Exists(filePath) || _localStorageOptions.AlwaysInvalidate)
@@ -83,7 +88,7 @@ class FileProcessor
                     continue;
                 }
 
-                _logger.LogInformation("Executing {jobTask}", jobTask.TaskType);
+                _logger.LogInformation("Executing {jobTask}", jobTask.TaskType);    
                 var continueProcessing = await jobTask.Process(filePath, result, cancellationToken);
                 if (!continueProcessing)
                 {
