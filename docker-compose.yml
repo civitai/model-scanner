@@ -17,7 +17,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - db:/data/
     ports:
-      - "80:80"
+      - "80:8080"
     depends_on:
       - model-scanner
 volumes:
