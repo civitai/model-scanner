@@ -30,7 +30,7 @@ public class HashTask : IJobTask
     ///    3. Calculates the SHA256 hash of the file without the metadata
     ///    4. If the hash of the file without the metadata is different from the hash in the metadata, it will update the metadata with the new hash
     /// </summary>
-    async Task<string> CalculateV3HashAndEnsureEmbeddedMetadataFixedAsync(FileStream fileStream, ScanResult result)
+    async Task<string> CalculateV3HashAndEnsureEmbeddedMetadataFixedAsync(FileStream fileStream, ScanResult result, bool disableHashFix)
     {
         // Get the length of the metadata
         var metadataLengthBuffer = new byte[8];
@@ -46,7 +46,6 @@ public class HashTask : IJobTask
             fileStream.ReadExactly(metadataBytes);
         }
 
-
         // Hash the rest of the file
         var hashBytes = SHA256.HashData(fileStream);
 
@@ -54,7 +53,7 @@ public class HashTask : IJobTask
         var hashString = BitConverter.ToString(hashBytes).Replace("-", string.Empty);
 
         // Return early if we didn't parse the metadata
-        if (metadataBytes.Length == 0)
+        if (metadataBytes.Length == 0 || disableHashFix)
         {
             return hashString;
         }
@@ -156,7 +155,7 @@ public class HashTask : IJobTask
         SHA256 sha256 = SHA256.Create();
 
         using var fileStream = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
-        var autov3HashString = await CalculateV3HashAndEnsureEmbeddedMetadataFixedAsync(fileStream, result);
+        var autov3HashString = await CalculateV3HashAndEnsureEmbeddedMetadataFixedAsync(fileStream, result, true);
         fileStream.Position = 0;
 
         var sha256HashString = GetHashString(SHA256.HashData(fileStream));
