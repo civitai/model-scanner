@@ -70,6 +70,8 @@ public class HashTask : IJobTask
                     var sshsModelHash = sshsModelHashNode?.ToString();
                     if (sshsModelHash is not null && !hashString.Equals(sshsModelHash, StringComparison.OrdinalIgnoreCase))
                     {
+                        _logger.LogInformation("File {fileName} contains an embedded hash {embeddedHash} that does not match calculated hash: {calculatedHash}.", fileStream.Name, sshsModelHash, hashString);
+
                         // If the embedded hash does not match the actual hash then fix the file on the spot
                         metadataNode.AsObject()["sshs_model_hash"] = JsonValue.Create(hashString);
 
